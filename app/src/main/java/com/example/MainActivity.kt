@@ -5,18 +5,13 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -29,9 +24,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Flare
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,14 +43,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +70,7 @@ import com.example.ui.screens.soul.SoulScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.ScreenTab
 import com.example.ui.viewmodel.SoulViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,7 +116,43 @@ fun GodlySystemApp(
     val isCheckedInToday by viewModel.isCheckedInToday.collectAsStateWithLifecycle()
     val systemToast by viewModel.systemToast.collectAsStateWithLifecycle()
 
-    var accumulatedVerticalDrag by remember { mutableFloatStateOf(0f) }
+    val tabs = remember {
+        listOf(
+            ScreenTab.MAIN,
+            ScreenTab.SOUL,
+            ScreenTab.RECORD,
+            ScreenTab.REFLECTION,
+            ScreenTab.HISTORY
+        )
+    }
+
+    val coroutineScope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(
+        initialPage = tabs.indexOf(currentTab).coerceAtLeast(0),
+        pageCount = { tabs.size }
+    )
+
+    // Synchronize programmatic tab changes smoothly into the continuous vertical pager
+    LaunchedEffect(currentTab) {
+        val targetIndex = tabs.indexOf(currentTab)
+        if (targetIndex >= 0 && pagerState.currentPage != targetIndex && !pagerState.isScrollInProgress) {
+            pagerState.animateScrollToPage(
+                page = targetIndex,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        }
+    }
+
+    // Synchronize natural gesture drag / swipe changes back to the ViewModel state
+    LaunchedEffect(pagerState.currentPage) {
+        val newTab = tabs.getOrNull(pagerState.currentPage) ?: ScreenTab.MAIN
+        if (currentTab != newTab) {
+            viewModel.setTab(newTab)
+        }
+    }
 
     val hasClaimableAchievements = remember(achievements, dailyLoginState) {
         !dailyLoginState.isClaimedToday || achievements.any { it.isUnlocked && !it.isClaimed }
@@ -128,33 +165,16 @@ fun GodlySystemApp(
         }
     }
 
+    val flingBehavior = PagerDefaults.flingBehavior(
+        state = pagerState,
+        pagerSnapDistance = PagerSnapDistance.atMost(1),
+        snapPositionalThreshold = 0.20f // Short swipe threshold (20%) responsive tracking; prevents accidental triggers from tiny movements
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .pointerInput(currentTab) {
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        accumulatedVerticalDrag = 0f
-                    },
-                    onDragEnd = {
-                        // Swipe up threshold -> Navigate from Sanctuary (MAIN) to Soul Matrix (SOUL)
-                        if (currentTab == ScreenTab.MAIN && accumulatedVerticalDrag < -75f) {
-                            viewModel.setTab(ScreenTab.SOUL)
-                        }
-                        // Swipe down threshold -> Navigate from Soul Matrix (SOUL) back to Sanctuary (MAIN)
-                        else if (currentTab == ScreenTab.SOUL && accumulatedVerticalDrag > 75f) {
-                            viewModel.setTab(ScreenTab.MAIN)
-                        }
-                        accumulatedVerticalDrag = 0f
-                    },
-                    onDragCancel = {
-                        accumulatedVerticalDrag = 0f
-                    }
-                ) { change, dragAmount ->
-                    accumulatedVerticalDrag += dragAmount
-                }
-            }
     ) {
         // Ambient Cosmic Particle Background
         CosmicParticlesCanvas()
@@ -164,45 +184,36 @@ fun GodlySystemApp(
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets.safeDrawing,
             bottomBar = {
-                // Pillow Shaped Bottom Layer Navigation
+                // Pillow Shaped Bottom Navigation Bar
                 PillowBottomNavigationBar(
                     currentTab = currentTab,
-                    onSelectTab = { viewModel.setTab(it) }
+                    onSelectTab = { tab ->
+                        viewModel.setTab(tab)
+                        val targetIndex = tabs.indexOf(tab)
+                        if (targetIndex >= 0) {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(
+                                    page = targetIndex,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMediumLow
+                                    )
+                                )
+                            }
+                        }
+                    }
                 )
             }
         ) { paddingValues ->
-            AnimatedContent(
-                targetState = currentTab,
-                transitionSpec = {
-                    val isMovingDownwardsInOrder = targetState.ordinal > initialState.ordinal
-                    if (isMovingDownwardsInOrder) {
-                        (slideInVertically(
-                            animationSpec = tween(380, easing = FastOutSlowInEasing),
-                            initialOffsetY = { it / 3 }
-                        ) + fadeIn(animationSpec = tween(320))) togetherWith (
-                            slideOutVertically(
-                                animationSpec = tween(380, easing = FastOutSlowInEasing),
-                                targetOffsetY = { -it / 3 }
-                            ) + fadeOut(animationSpec = tween(280))
-                        )
-                    } else {
-                        (slideInVertically(
-                            animationSpec = tween(380, easing = FastOutSlowInEasing),
-                            initialOffsetY = { -it / 3 }
-                        ) + fadeIn(animationSpec = tween(320))) togetherWith (
-                            slideOutVertically(
-                                animationSpec = tween(380, easing = FastOutSlowInEasing),
-                                targetOffsetY = { it / 3 }
-                            ) + fadeOut(animationSpec = tween(280))
-                        )
-                    }
-                },
-                label = "screen_vertical_transition",
+            VerticalPager(
+                state = pagerState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-            ) { tab ->
-                when (tab) {
+                    .padding(paddingValues),
+                flingBehavior = flingBehavior,
+                key = { pageIndex -> tabs[pageIndex].name }
+            ) { pageIndex ->
+                when (tabs[pageIndex]) {
                     ScreenTab.MAIN -> MainScreen(
                         soul = soulProfile,
                         trials = dailyTrials,
@@ -217,6 +228,12 @@ fun GodlySystemApp(
                         onOpenAchievements = { viewModel.openAchievements() },
                         onOpenWardrobe = { viewModel.openWardrobe() }
                     )
+                    ScreenTab.SOUL -> SoulScreen(
+                        soul = soulProfile,
+                        onBack = { viewModel.setTab(ScreenTab.MAIN) },
+                        onOpenWardrobe = { viewModel.openWardrobe() },
+                        onOpenHistory = { viewModel.setTab(ScreenTab.HISTORY) }
+                    )
                     ScreenTab.RECORD -> RecordScreen(
                         formState = recordFormState,
                         onFormUpdate = { viewModel.updateRecordForm(it) },
@@ -229,12 +246,6 @@ fun GodlySystemApp(
                             viewModel.submitTrial(trial, index, reflection)
                         },
                         onBack = { viewModel.setTab(ScreenTab.MAIN) }
-                    )
-                    ScreenTab.SOUL -> SoulScreen(
-                        soul = soulProfile,
-                        onBack = { viewModel.setTab(ScreenTab.MAIN) },
-                        onOpenWardrobe = { viewModel.openWardrobe() },
-                        onOpenHistory = { viewModel.setTab(ScreenTab.HISTORY) }
                     )
                     ScreenTab.HISTORY -> HistoryScreen(
                         events = evolutionEvents,
@@ -304,19 +315,19 @@ fun PillowBottomNavigationBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .windowInsetsPadding(WindowInsets.navigationBars),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(62.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .height(60.dp)
+                .clip(RoundedCornerShape(30.dp))
                 .border(
                     width = 1.2.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(32.dp)
+                    shape = RoundedCornerShape(30.dp)
                 )
                 .testTag("pillow_bottom_nav"),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
@@ -326,7 +337,7 @@ fun PillowBottomNavigationBar(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -341,9 +352,33 @@ fun PillowBottomNavigationBar(
                 PillowNavItem(
                     selected = currentTab == ScreenTab.SOUL,
                     icon = Icons.Default.SelfImprovement,
-                    label = "Soul Matrix",
+                    label = "Soul",
                     onClick = { onSelectTab(ScreenTab.SOUL) },
                     testTag = "nav_soul"
+                )
+
+                PillowNavItem(
+                    selected = currentTab == ScreenTab.RECORD,
+                    icon = Icons.Default.Flare,
+                    label = "Record",
+                    onClick = { onSelectTab(ScreenTab.RECORD) },
+                    testTag = "nav_record"
+                )
+
+                PillowNavItem(
+                    selected = currentTab == ScreenTab.REFLECTION,
+                    icon = Icons.Default.AutoStories,
+                    label = "Trials",
+                    onClick = { onSelectTab(ScreenTab.REFLECTION) },
+                    testTag = "nav_reflection"
+                )
+
+                PillowNavItem(
+                    selected = currentTab == ScreenTab.HISTORY,
+                    icon = Icons.Default.History,
+                    label = "Chronicle",
+                    onClick = { onSelectTab(ScreenTab.HISTORY) },
+                    testTag = "nav_history"
                 )
             }
         }
@@ -360,7 +395,7 @@ private fun PillowNavItem(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
                 else Color.Transparent
@@ -368,30 +403,33 @@ private fun PillowNavItem(
             .border(
                 width = if (selected) 1.dp else 0.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Transparent,
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(20.dp)
             )
             .clickable { onClick() }
-            .padding(horizontal = 22.dp, vertical = 8.dp)
+            .padding(horizontal = if (selected) 10.dp else 6.dp, vertical = 6.dp)
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(18.dp)
             )
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
+            if (selected) {
+                Text(
+                    text = label,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

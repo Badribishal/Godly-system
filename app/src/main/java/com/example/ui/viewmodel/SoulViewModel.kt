@@ -56,6 +56,8 @@ data class RecordFormState(
     val selectedEmotion: String = "Equilibrium",
     val primaryShadow: ShadowType? = null,
     val primaryVirtue: VirtueType? = null,
+    val selectedShadows: Set<ShadowType> = emptySet(),
+    val selectedVirtues: Set<VirtueType> = emptySet(),
     val intensityMultiplier: Float = 1.0f,
     val situation: String = "",
     val intention: String = "",
@@ -193,10 +195,19 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
             // Restore evaluation draft if previously saved before app close
             val savedDraft = repository.getEvaluationDraft()
             if (savedDraft != null) {
+                val restoredShadows = savedDraft.primaryShadow?.split(",")?.mapNotNull { name ->
+                    runCatching { ShadowType.valueOf(name.trim()) }.getOrNull()
+                }?.toSet() ?: emptySet()
+                val restoredVirtues = savedDraft.primaryVirtue?.split(",")?.mapNotNull { name ->
+                    runCatching { VirtueType.valueOf(name.trim()) }.getOrNull()
+                }?.toSet() ?: emptySet()
+
                 _recordFormState.value = RecordFormState(
                     selectedEmotion = savedDraft.emotion,
-                    primaryShadow = savedDraft.primaryShadow?.let { runCatching { ShadowType.valueOf(it) }.getOrNull() },
-                    primaryVirtue = savedDraft.primaryVirtue?.let { runCatching { VirtueType.valueOf(it) }.getOrNull() },
+                    primaryShadow = restoredShadows.firstOrNull(),
+                    primaryVirtue = restoredVirtues.firstOrNull(),
+                    selectedShadows = restoredShadows,
+                    selectedVirtues = restoredVirtues,
                     situation = savedDraft.situation,
                     intention = savedDraft.intention,
                     action = savedDraft.action,
@@ -414,12 +425,15 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun persistDraft(state: RecordFormState) {
         viewModelScope.launch {
+            val allShadows = if (state.selectedShadows.isNotEmpty()) state.selectedShadows else listOfNotNull(state.primaryShadow).toSet()
+            val allVirtues = if (state.selectedVirtues.isNotEmpty()) state.selectedVirtues else listOfNotNull(state.primaryVirtue).toSet()
+
             repository.saveEvaluationDraft(
                 EvaluationDraftEntity(
                     id = 1,
                     emotion = state.selectedEmotion,
-                    primaryShadow = state.primaryShadow?.name,
-                    primaryVirtue = state.primaryVirtue?.name,
+                    primaryShadow = if (allShadows.isNotEmpty()) allShadows.joinToString(",") { it.name } else null,
+                    primaryVirtue = if (allVirtues.isNotEmpty()) allVirtues.joinToString(",") { it.name } else null,
                     situation = state.situation,
                     intention = state.intention,
                     action = state.action,
@@ -433,17 +447,20 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitRecord() {
         val state = _recordFormState.value
-        val sinName = state.primaryShadow?.displayName
-        val virtueName = state.primaryVirtue?.displayName
+        val allShadows = if (state.selectedShadows.isNotEmpty()) state.selectedShadows else listOfNotNull(state.primaryShadow).toSet()
+        val allVirtues = if (state.selectedVirtues.isNotEmpty()) state.selectedVirtues else listOfNotNull(state.primaryVirtue).toSet()
+
+        val shadowNames = allShadows.joinToString(", ") { it.displayName }
+        val virtueNames = allVirtues.joinToString(", ") { it.displayName }
 
         val effectiveEmotion = if (state.selectedEmotion.isNotBlank() && state.selectedEmotion != "Equilibrium") {
             state.selectedEmotion
-        } else if (sinName != null && virtueName != null) {
-            "$sinName & $virtueName"
-        } else if (sinName != null) {
-            sinName
-        } else if (virtueName != null) {
-            virtueName
+        } else if (shadowNames.isNotBlank() && virtueNames.isNotBlank()) {
+            "$shadowNames & $virtueNames"
+        } else if (shadowNames.isNotBlank()) {
+            shadowNames
+        } else if (virtueNames.isNotBlank()) {
+            virtueNames
         } else {
             "Conscious Alignment"
         }
@@ -453,9 +470,19 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
             val input = RecordInput(
                 emotion = effectiveEmotion,
-                primaryShadow = state.primaryShadow,
-                primaryVirtue = state.primaryVirtue,
-                situation = state.situation.ifBlank { "Catalyzed by ${sinName ?: "Shadow"} and ${virtueName ?: "Virtue"}" },
+                primaryShadow = allShadows.firstOrNull(),
+                primaryVirtue = allVirtues.firstOrNull(),
+                situation = state.situation.ifBlank {
+                    if (shadowNames.isNotBlank() && virtueNames.isNotBlank()) {
+                        "Catalyzed by [$shadowNames] and [$virtueNames]"
+                    } else if (shadowNames.isNotBlank()) {
+                        "Transmuting shadow forces: $shadowNames"
+                    } else if (virtueNames.isNotBlank()) {
+                        "Cultivating sacred virtues: $virtueNames"
+                    } else {
+                        "Conscious alignment of inner forces"
+                    }
+                },
                 intention = state.intention.ifBlank { "Transmuted cosmic forces into conscious growth" },
                 action = state.action.ifBlank { "Balanced dualities within the soul matrix" },
                 consequence = state.consequence.ifBlank { "Internal equilibrium heightened" },
@@ -488,7 +515,9 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
         val newState = _recordFormState.value.copy(
             selectedEmotion = emotion,
             primaryShadow = shadow,
-            primaryVirtue = virtue
+            primaryVirtue = virtue,
+            selectedShadows = if (shadow != null) setOf(shadow) else emptySet(),
+            selectedVirtues = if (virtue != null) setOf(virtue) else emptySet()
         )
         _recordFormState.value = newState
         persistDraft(newState)

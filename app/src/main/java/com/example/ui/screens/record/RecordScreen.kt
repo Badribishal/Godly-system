@@ -215,6 +215,12 @@ fun RecordScreen(
         // 1. SEVEN DEADLY SINS SECTION
         if (selectedForceTab == 0 || selectedForceTab == 1) {
             item {
+                val selectedShadows = if (formState.selectedShadows.isNotEmpty()) {
+                    formState.selectedShadows
+                } else {
+                    listOfNotNull(formState.primaryShadow).toSet()
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -243,24 +249,24 @@ fun RecordScreen(
                                 )
                             }
 
-                            formState.primaryShadow?.let {
+                            if (selectedShadows.isNotEmpty()) {
                                 Text(
-                                    text = "Selected: ${it.displayName}",
+                                    text = "${selectedShadows.size} Selected",
                                     fontSize = 10.5.sp,
-                                    color = Color(it.colorHex),
+                                    color = Color(0xFFF87171),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // Grid of 7 Sins
+                        // Grid of 7 Sins (Multi-select enabled)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             ShadowType.values().forEach { sin ->
-                                val isSelected = formState.primaryShadow == sin
+                                val isSelected = selectedShadows.contains(sin)
                                 val sinColor = Color(sin.colorHex)
                                 val animatedBg by animateColorAsState(
                                     targetValue = if (isSelected) sinColor.copy(alpha = 0.28f) else Color(0xFF130E26),
@@ -278,10 +284,12 @@ fun RecordScreen(
                                             shape = RoundedCornerShape(14.dp)
                                         )
                                         .clickable {
+                                            val newSet = if (isSelected) selectedShadows - sin else selectedShadows + sin
                                             onFormUpdate {
                                                 it.copy(
-                                                    primaryShadow = if (isSelected) null else sin,
-                                                    selectedEmotion = if (isSelected) "" else sin.displayName
+                                                    selectedShadows = newSet,
+                                                    primaryShadow = newSet.firstOrNull(),
+                                                    selectedEmotion = if (newSet.isEmpty()) "Equilibrium" else newSet.joinToString(", ") { s -> s.displayName }
                                                 )
                                             }
                                         }
@@ -326,6 +334,12 @@ fun RecordScreen(
         // 2. SEVEN HEAVENLY VIRTUES SECTION
         if (selectedForceTab == 0 || selectedForceTab == 2) {
             item {
+                val selectedVirtues = if (formState.selectedVirtues.isNotEmpty()) {
+                    formState.selectedVirtues
+                } else {
+                    listOfNotNull(formState.primaryVirtue).toSet()
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -354,24 +368,24 @@ fun RecordScreen(
                                 )
                             }
 
-                            formState.primaryVirtue?.let {
+                            if (selectedVirtues.isNotEmpty()) {
                                 Text(
-                                    text = "Selected: ${it.displayName}",
+                                    text = "${selectedVirtues.size} Selected",
                                     fontSize = 10.5.sp,
-                                    color = Color(it.colorHex),
+                                    color = RadiantGoldBright,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
 
-                        // Grid of 7 Virtues
+                        // Grid of 7 Virtues (Multi-select enabled)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             VirtueType.values().forEach { virtue ->
-                                val isSelected = formState.primaryVirtue == virtue
+                                val isSelected = selectedVirtues.contains(virtue)
                                 val virtueColor = Color(virtue.colorHex)
                                 val animatedBg by animateColorAsState(
                                     targetValue = if (isSelected) virtueColor.copy(alpha = 0.28f) else Color(0xFF130E26),
@@ -389,10 +403,12 @@ fun RecordScreen(
                                             shape = RoundedCornerShape(14.dp)
                                         )
                                         .clickable {
+                                            val newSet = if (isSelected) selectedVirtues - virtue else selectedVirtues + virtue
                                             onFormUpdate {
                                                 it.copy(
-                                                    primaryVirtue = if (isSelected) null else virtue,
-                                                    selectedEmotion = if (isSelected) "" else virtue.displayName
+                                                    selectedVirtues = newSet,
+                                                    primaryVirtue = newSet.firstOrNull(),
+                                                    selectedEmotion = if (newSet.isEmpty()) "Equilibrium" else newSet.joinToString(", ") { v -> v.displayName }
                                                 )
                                             }
                                         }
@@ -434,19 +450,27 @@ fun RecordScreen(
             }
         }
 
-        // 3. ACTIVE TRANSMUTATION MATRIX SUMMARY
+        // 3. MINIMALISTIC CONFIRMATION & SYNTHESIS CARD
         item {
+            val allShadows = if (formState.selectedShadows.isNotEmpty()) {
+                formState.selectedShadows
+            } else {
+                listOfNotNull(formState.primaryShadow).toSet()
+            }
+            val allVirtues = if (formState.selectedVirtues.isNotEmpty()) {
+                formState.selectedVirtues
+            } else {
+                listOfNotNull(formState.primaryVirtue).toSet()
+            }
+            val hasSelections = allShadows.isNotEmpty() || allVirtues.isNotEmpty()
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color(0xFF150F2C), Color(0xFF0D091D))
-                        )
-                    )
-                    .border(1.dp, CelestialAmethyst.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                    .padding(14.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF0F0A1F))
+                    .border(1.dp, SurfaceCardBorder, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
                     .testTag("transmutation_summary_card")
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -455,78 +479,79 @@ fun RecordScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "ALCHEMICAL SYNTHESIS",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = RadiantGold,
-                            letterSpacing = 1.sp
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(text = "✦", fontSize = 12.sp, color = RadiantGold)
+                            Text(
+                                text = "TRANSMUTATION MATRIX",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = RadiantGold,
+                                letterSpacing = 1.sp
+                            )
+                        }
 
                         Text(
-                            text = if (formState.primaryShadow != null && formState.primaryVirtue != null) "Dual Transmutation"
-                            else if (formState.primaryShadow != null) "Shadow Catalyst"
-                            else if (formState.primaryVirtue != null) "Virtue Ascension"
-                            else "Awaiting Catalyst Selection",
-                            fontSize = 10.5.sp,
-                            color = CelestialAmethystLight,
-                            fontWeight = FontWeight.SemiBold
+                            text = when {
+                                allShadows.isNotEmpty() && allVirtues.isNotEmpty() -> "${allShadows.size} Shadows • ${allVirtues.size} Virtues"
+                                allShadows.isNotEmpty() -> "${allShadows.size} Shadow Catalysts"
+                                allVirtues.isNotEmpty() -> "${allVirtues.size} Virtue Forces"
+                                else -> "Awaiting Selection"
+                            },
+                            fontSize = 10.sp,
+                            color = if (hasSelections) EtherealCyan else TextMuted,
+                            fontWeight = FontWeight.Medium
                         )
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Shadow Force Box
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF090614))
-                                .border(0.8.dp, formState.primaryShadow?.let { Color(it.colorHex) } ?: SurfaceCardBorder, RoundedCornerShape(10.dp))
-                                .padding(10.dp),
-                            contentAlignment = Alignment.Center
+                    if (hasSelections) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(text = "SHADOW CATALYST", fontSize = 8.5.sp, color = TextMuted, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = formState.primaryShadow?.let { "${it.runeSymbol} ${it.displayName}" } ?: "— None Selected —",
-                                    fontSize = 12.sp,
-                                    color = formState.primaryShadow?.let { Color(it.colorHex) } ?: TextMuted,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            allShadows.forEach { sin ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(sin.colorHex).copy(alpha = 0.18f))
+                                        .border(0.6.dp, Color(sin.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${sin.runeSymbol} ${sin.displayName}",
+                                        fontSize = 10.5.sp,
+                                        color = Color(sin.colorHex),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            allVirtues.forEach { virtue ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(virtue.colorHex).copy(alpha = 0.18f))
+                                        .border(0.6.dp, Color(virtue.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${virtue.runeSymbol} ${virtue.displayName}",
+                                        fontSize = 10.5.sp,
+                                        color = Color(virtue.colorHex),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                             }
                         }
-
-                        Icon(
-                            imageVector = Icons.Default.Flare,
-                            contentDescription = "Alchemy",
-                            tint = RadiantGold,
-                            modifier = Modifier.padding(horizontal = 8.dp).size(18.dp)
+                    } else {
+                        Text(
+                            text = "Select one or more archetypal catalysts above to begin transmutation.",
+                            fontSize = 11.sp,
+                            color = TextMuted
                         )
-
-                        // Virtue Force Box
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color(0xFF090614))
-                                .border(0.8.dp, formState.primaryVirtue?.let { Color(it.colorHex) } ?: SurfaceCardBorder, RoundedCornerShape(10.dp))
-                                .padding(10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(text = "VIRTUE ASCENSION", fontSize = 8.5.sp, color = TextMuted, fontWeight = FontWeight.Bold)
-                                Text(
-                                    text = formState.primaryVirtue?.let { "${it.runeSymbol} ${it.displayName}" } ?: "— None Selected —",
-                                    fontSize = 12.sp,
-                                    color = formState.primaryVirtue?.let { Color(it.colorHex) } ?: TextMuted,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
                 }
             }
