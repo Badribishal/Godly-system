@@ -1,0 +1,7 @@
+{
+  "name": "Godly System",
+  "description": "Mysterious fantasy-based personality evaluation system that analyzes human patterns, emotions, and choices to reveal evolving archetypes, races, classes, and titles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

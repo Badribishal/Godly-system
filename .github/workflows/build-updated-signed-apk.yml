@@ -1,0 +1,142 @@
+name: Build Updated Signed Release APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build, Verify & Release Signed APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Validate Secrets and Restore Keystore
+        id: restore_keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "Checking required signing secrets presence..."
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::Missing secret: ANDROID_KEYSTORE_BASE64"
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Missing secret: ANDROID_KEYSTORE_PASSWORD"
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEY_ALIAS" ]; then
+            echo "::error::Missing secret: ANDROID_KEY_ALIAS"
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::Missing secret: ANDROID_KEY_PASSWORD"
+            exit 1
+          fi
+
+          echo "Decoding and restoring existing keystore into upload-keystore.jks..."
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+
+          if [ ! -f upload-keystore.jks ] || [ ! -s upload-keystore.jks ]; then
+            echo "::error::Failed to restore upload-keystore.jks or file is empty."
+            exit 1
+          fi
+
+          echo "Verifying keystore integrity with provided credentials..."
+          keytool -list -keystore upload-keystore.jks -storepass "$ANDROID_KEYSTORE_PASSWORD" > /dev/null 2>&1
+          if [ $? -ne 0 ]; then
+            echo "::error::Keystore validation failed. Unable to open upload-keystore.jks with ANDROID_KEYSTORE_PASSWORD."
+            exit 1
+          fi
+
+          KEYSTORE_ABS_PATH="$(pwd)/upload-keystore.jks"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_ABS_PATH" >> $GITHUB_ENV
+          echo "KEYSTORE_PATH=$KEYSTORE_ABS_PATH" >> $GITHUB_ENV
+          echo "Keystore successfully restored and validated."
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Build Signed Release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ env.ANDROID_KEYSTORE_PATH }}
+          KEYSTORE_PATH: ${{ env.ANDROID_KEYSTORE_PATH }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --stacktrace --no-daemon
+
+      - name: Locate and Verify Signed APK
+        id: verify_apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "::error::No release APK found in app/build/outputs/apk/release"
+            exit 1
+          fi
+          echo "Found release APK at: $APK_PATH"
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
+
+          # Locate latest apksigner
+          LATEST_BUILD_TOOLS=$(ls -1d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -n 1)
+          APKSIGNER="$LATEST_BUILD_TOOLS/apksigner"
+          if [ ! -f "$APKSIGNER" ]; then
+            APKSIGNER=$(which apksigner || true)
+          fi
+
+          if [ -n "$APKSIGNER" ] && [ -x "$APKSIGNER" ]; then
+            echo "Verifying APK cryptographic signature with apksigner ($APKSIGNER)..."
+            "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+            if [ $? -ne 0 ]; then
+              echo "::error::APK signature verification failed!"
+              exit 1
+            fi
+            echo "APK signature successfully verified!"
+          else
+            echo "apksigner not found in standard paths, checking jarsigner..."
+            jarsigner -verify -verbose -certs "$APK_PATH" || exit 1
+            echo "APK signature verified successfully via jarsigner."
+          fi
+
+      - name: Upload Signed Release APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Updated-Signed-Release-APK
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v1.1-b${{ github.run_number }}"
+          name: "Signed Release APK v1.1"
+          body: |
+            ## Release v1.1 (Build #${{ github.run_number }})
+            - Updated signed release APK built with production signing key.
+            - Cryptographically verified using Android `apksigner`.
+            - `versionCode`: 2
+            - `versionName`: 1.1
+          files: ${{ env.APK_PATH }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

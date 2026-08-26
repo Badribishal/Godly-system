@@ -1,0 +1,46 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Minimal Golden 8-Pointed Celestial Star within 66dp safe zone -->
+    
+    <!-- Primary 4-Pointed Sharp Diamond Star Rays -->
+    <path
+        android:pathData="M54,28 L57.5,49 L78.5,52.5 L57.5,56 L54,77 L50.5,56 L29.5,52.5 L50.5,49 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="29.5"
+                android:startY="28"
+                android:endX="78.5"
+                android:endY="77"
+                android:type="linear">
+                <item android:color="#FDE047" android:offset="0.0" />
+                <item android:color="#F59E0B" android:offset="0.55" />
+                <item android:color="#D97706" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Secondary Diagonal 4-Pointed Accent Rays (Minimalistic) -->
+    <path
+        android:pathData="M54,42 L56.5,50 L64.5,52.5 L56.5,55 L54,63 L51.5,55 L43.5,52.5 L51.5,50 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="43.5"
+                android:startY="42"
+                android:endX="64.5"
+                android:endY="63"
+                android:type="linear">
+                <item android:color="#FEF08A" android:offset="0.0" />
+                <item android:color="#FBBF24" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Pure Minimal Center Core Light Point -->
+    <path
+        android:pathData="M54,48 L56.2,52.5 L54,57 L51.8,52.5 Z"
+        android:fillColor="#FFFBEB" />
+</vector>
