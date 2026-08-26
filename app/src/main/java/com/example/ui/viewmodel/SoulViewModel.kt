@@ -8,6 +8,7 @@ import com.example.data.engine.SoulResonanceData
 import com.example.data.engine.SoulResonanceEngine
 import com.example.data.local.AppDatabase
 import com.example.data.local.DailyTrialEntity
+import com.example.data.local.EvaluationDraftEntity
 import com.example.data.local.EvaluationRecordEntity
 import com.example.data.local.EvolutionEventEntity
 import com.example.data.model.Achievement
@@ -189,6 +190,21 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.initializeIfEmpty()
             refreshAchievements()
+            // Restore evaluation draft if previously saved before app close
+            val savedDraft = repository.getEvaluationDraft()
+            if (savedDraft != null) {
+                _recordFormState.value = RecordFormState(
+                    selectedEmotion = savedDraft.emotion,
+                    primaryShadow = savedDraft.primaryShadow?.let { runCatching { ShadowType.valueOf(it) }.getOrNull() },
+                    primaryVirtue = savedDraft.primaryVirtue?.let { runCatching { VirtueType.valueOf(it) }.getOrNull() },
+                    situation = savedDraft.situation,
+                    intention = savedDraft.intention,
+                    action = savedDraft.action,
+                    consequence = savedDraft.consequence,
+                    reflection = savedDraft.reflection,
+                    isSubmitting = false
+                )
+            }
         }
     }
 
@@ -391,7 +407,28 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateRecordForm(update: (RecordFormState) -> RecordFormState) {
-        _recordFormState.value = update(_recordFormState.value)
+        val newState = update(_recordFormState.value)
+        _recordFormState.value = newState
+        persistDraft(newState)
+    }
+
+    private fun persistDraft(state: RecordFormState) {
+        viewModelScope.launch {
+            repository.saveEvaluationDraft(
+                EvaluationDraftEntity(
+                    id = 1,
+                    emotion = state.selectedEmotion,
+                    primaryShadow = state.primaryShadow?.name,
+                    primaryVirtue = state.primaryVirtue?.name,
+                    situation = state.situation,
+                    intention = state.intention,
+                    action = state.action,
+                    consequence = state.consequence,
+                    reflection = state.reflection,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            )
+        }
     }
 
     fun submitRecord() {
@@ -429,7 +466,8 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
             _lastEvaluationResult.value = result
             _showAwakeningModal.value = true
 
-            // Reset form
+            // Clear draft from Room database and reset form
+            repository.clearEvaluationDraft()
             _recordFormState.value = RecordFormState()
             refreshAchievements()
         }
@@ -447,10 +485,12 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPresetEmotion(emotion: String, shadow: ShadowType?, virtue: VirtueType?) {
-        _recordFormState.value = _recordFormState.value.copy(
+        val newState = _recordFormState.value.copy(
             selectedEmotion = emotion,
             primaryShadow = shadow,
             primaryVirtue = virtue
         )
+        _recordFormState.value = newState
+        persistDraft(newState)
     }
 }

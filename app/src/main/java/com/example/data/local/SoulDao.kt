@@ -54,4 +54,17 @@ interface SoulDao {
 
     @Update
     suspend fun updateTrial(trial: DailyTrialEntity)
+
+    // Evaluation Draft Progress
+    @Query("SELECT * FROM evaluation_draft WHERE id = 1")
+    fun getEvaluationDraftFlow(): Flow<EvaluationDraftEntity?>
+
+    @Query("SELECT * FROM evaluation_draft WHERE id = 1")
+    suspend fun getEvaluationDraft(): EvaluationDraftEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveEvaluationDraft(draft: EvaluationDraftEntity)
+
+    @Query("DELETE FROM evaluation_draft WHERE id = 1")
+    suspend fun clearEvaluationDraft()
 }

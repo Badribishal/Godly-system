@@ -375,7 +375,8 @@ fun MainScreen(
                     text = "« The System evaluates patterns, not moral worth. Every choice leaves an astral imprint. »",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
-                    fontFamily = FontFamily.Serif
+                    fontFamily = FontFamily.Serif,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         }
@@ -419,7 +420,8 @@ private fun SanctuaryIconButton(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = TextPrimary,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }

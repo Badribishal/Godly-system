@@ -76,3 +76,18 @@ data class DailyTrialEntity(
     val selectedOptionIndex: Int? = null,
     val userReflection: String? = null
 )
+
+@Entity(tableName = "evaluation_draft")
+data class EvaluationDraftEntity(
+    @PrimaryKey
+    val id: Int = 1,
+    val emotion: String = "Serene",
+    val primaryShadow: String? = null,
+    val primaryVirtue: String? = null,
+    val situation: String = "",
+    val intention: String = "",
+    val action: String = "",
+    val consequence: String = "",
+    val reflection: String = "",
+    val lastUpdated: Long = System.currentTimeMillis()
+)

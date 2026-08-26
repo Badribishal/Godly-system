@@ -1,8 +1,10 @@
 package com.example.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 
 @Composable
 fun MyApplicationTheme(
@@ -21,9 +23,16 @@ fun MyApplicationTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+        typography = Typography
+    ) {
+        // Enforce default bodyMedium text style with zero font-padding and centered alignment
+        CompositionLocalProvider(
+            LocalTextStyle provides Typography.bodyMedium
+        ) {
+            content()
+        }
+    }
 }
+
 
 

@@ -10,9 +10,10 @@ import androidx.room.RoomDatabase
         EvaluationRecordEntity::class,
         SoulProfileEntity::class,
         EvolutionEventEntity::class,
-        DailyTrialEntity::class
+        DailyTrialEntity::class,
+        EvaluationDraftEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -4,6 +4,7 @@ import com.example.data.engine.PersonalityEvaluationEngine
 import com.example.data.engine.SoulResonanceData
 import com.example.data.export.SoulPdfExporter
 import com.example.data.local.DailyTrialEntity
+import com.example.data.local.EvaluationDraftEntity
 import com.example.data.local.EvaluationRecordEntity
 import com.example.data.local.EvolutionEventEntity
 import com.example.data.local.SoulDao
@@ -38,6 +39,21 @@ class SoulRepository(private val soulDao: SoulDao) {
 
     val allTrialsFlow: Flow<List<DailyTrialEntity>> = soulDao.getAllTrialsFlow()
         .flowOn(Dispatchers.IO)
+
+    val evaluationDraftFlow: Flow<EvaluationDraftEntity?> = soulDao.getEvaluationDraftFlow()
+        .flowOn(Dispatchers.IO)
+
+    suspend fun getEvaluationDraft(): EvaluationDraftEntity? = withContext(Dispatchers.IO) {
+        soulDao.getEvaluationDraft()
+    }
+
+    suspend fun saveEvaluationDraft(draft: EvaluationDraftEntity) = withContext(Dispatchers.IO) {
+        soulDao.saveEvaluationDraft(draft)
+    }
+
+    suspend fun clearEvaluationDraft() = withContext(Dispatchers.IO) {
+        soulDao.clearEvaluationDraft()
+    }
 
     suspend fun initializeIfEmpty() = withContext(Dispatchers.IO) {
         val existing = soulDao.getSoulProfile()

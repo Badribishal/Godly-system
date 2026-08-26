@@ -6,12 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -24,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -32,21 +36,23 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,7 +68,6 @@ import com.example.ui.screens.record.RecordScreen
 import com.example.ui.screens.reflection.ReflectionScreen
 import com.example.ui.screens.soul.SoulScreen
 import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.SurfaceCardBorder
 import com.example.ui.viewmodel.ScreenTab
 import com.example.ui.viewmodel.SoulViewModel
 
@@ -110,6 +115,8 @@ fun GodlySystemApp(
     val isCheckedInToday by viewModel.isCheckedInToday.collectAsStateWithLifecycle()
     val systemToast by viewModel.systemToast.collectAsStateWithLifecycle()
 
+    var accumulatedVerticalDrag by remember { mutableFloatStateOf(0f) }
+
     val hasClaimableAchievements = remember(achievements, dailyLoginState) {
         !dailyLoginState.isClaimedToday || achievements.any { it.isUnlocked && !it.isClaimed }
     }
@@ -125,6 +132,29 @@ fun GodlySystemApp(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .pointerInput(currentTab) {
+                detectVerticalDragGestures(
+                    onDragStart = {
+                        accumulatedVerticalDrag = 0f
+                    },
+                    onDragEnd = {
+                        // Swipe up threshold -> Navigate from Sanctuary (MAIN) to Soul Matrix (SOUL)
+                        if (currentTab == ScreenTab.MAIN && accumulatedVerticalDrag < -75f) {
+                            viewModel.setTab(ScreenTab.SOUL)
+                        }
+                        // Swipe down threshold -> Navigate from Soul Matrix (SOUL) back to Sanctuary (MAIN)
+                        else if (currentTab == ScreenTab.SOUL && accumulatedVerticalDrag > 75f) {
+                            viewModel.setTab(ScreenTab.MAIN)
+                        }
+                        accumulatedVerticalDrag = 0f
+                    },
+                    onDragCancel = {
+                        accumulatedVerticalDrag = 0f
+                    }
+                ) { change, dragAmount ->
+                    accumulatedVerticalDrag += dragAmount
+                }
+            }
     ) {
         // Ambient Cosmic Particle Background
         CosmicParticlesCanvas()
@@ -143,8 +173,31 @@ fun GodlySystemApp(
         ) { paddingValues ->
             AnimatedContent(
                 targetState = currentTab,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "screen_transition",
+                transitionSpec = {
+                    val isMovingDownwardsInOrder = targetState.ordinal > initialState.ordinal
+                    if (isMovingDownwardsInOrder) {
+                        (slideInVertically(
+                            animationSpec = tween(380, easing = FastOutSlowInEasing),
+                            initialOffsetY = { it / 3 }
+                        ) + fadeIn(animationSpec = tween(320))) togetherWith (
+                            slideOutVertically(
+                                animationSpec = tween(380, easing = FastOutSlowInEasing),
+                                targetOffsetY = { -it / 3 }
+                            ) + fadeOut(animationSpec = tween(280))
+                        )
+                    } else {
+                        (slideInVertically(
+                            animationSpec = tween(380, easing = FastOutSlowInEasing),
+                            initialOffsetY = { -it / 3 }
+                        ) + fadeIn(animationSpec = tween(320))) togetherWith (
+                            slideOutVertically(
+                                animationSpec = tween(380, easing = FastOutSlowInEasing),
+                                targetOffsetY = { it / 3 }
+                            ) + fadeOut(animationSpec = tween(280))
+                        )
+                    }
+                },
+                label = "screen_vertical_transition",
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
@@ -336,7 +389,8 @@ private fun PillowNavItem(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }

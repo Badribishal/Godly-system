@@ -2,12 +2,12 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Obsidian Canvas & Surface Tones
-val AbyssBlack = Color(0xFF08060F)
-val CosmicDark = Color(0xFF0E0A1A)
-val SurfaceCard = Color(0xFF161129)
-val SurfaceCardElevated = Color(0xFF1F183B)
-val SurfaceCardBorder = Color(0xFF332958)
+// True AMOLED Black & Low-Power Surface Tones (0% OLED emission canvas)
+val AbyssBlack = Color(0xFF000000)
+val CosmicDark = Color(0xFF05050A)
+val SurfaceCard = Color(0xFF0C0C14)
+val SurfaceCardElevated = Color(0xFF141420)
+val SurfaceCardBorder = Color(0xFF232336)
 
 // Divine Accents
 val RadiantGold = Color(0xFFF59E0B)
