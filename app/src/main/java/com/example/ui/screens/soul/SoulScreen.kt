@@ -54,6 +54,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.model.ShadowType
 import com.example.data.model.SoulIdentity
 import com.example.data.model.VirtueType
+import com.example.ui.components.GodlyPoeticFeedbackCard
 import com.example.ui.components.IdentityHeader
 import com.example.ui.components.ShadowItemRow
 import com.example.ui.components.SoulRadarChart
@@ -153,6 +154,11 @@ fun SoulScreen(
         // Identity Card
         item {
             IdentityHeader(soul = soul)
+        }
+
+        // Automated Godly Identity Poetic Reflection
+        item {
+            GodlyPoeticFeedbackCard(soul = soul)
         }
 
         // Radar Visualization Card

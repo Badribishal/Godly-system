@@ -212,6 +212,113 @@ fun RecordScreen(
             }
         }
 
+        // CONFIRMATION & TRANSMUTATION MATRIX CARD (Positioned up above trait pickers for instant feedback)
+        item {
+            val allShadows = if (formState.selectedShadows.isNotEmpty()) {
+                formState.selectedShadows
+            } else {
+                listOfNotNull(formState.primaryShadow).toSet()
+            }
+            val allVirtues = if (formState.selectedVirtues.isNotEmpty()) {
+                formState.selectedVirtues
+            } else {
+                listOfNotNull(formState.primaryVirtue).toSet()
+            }
+            val hasSelections = allShadows.isNotEmpty() || allVirtues.isNotEmpty()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF0F0A1F))
+                    .border(1.dp, if (hasSelections) RadiantGold.copy(alpha = 0.6f) else SurfaceCardBorder, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 12.dp)
+                    .testTag("transmutation_summary_card")
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(text = "✦", fontSize = 12.sp, color = RadiantGold)
+                            Text(
+                                text = "CONFIRM TRANSMUTATION MATRIX",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = RadiantGold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Text(
+                            text = when {
+                                allShadows.isNotEmpty() && allVirtues.isNotEmpty() -> "${allShadows.size} Shadows • ${allVirtues.size} Virtues"
+                                allShadows.isNotEmpty() -> "${allShadows.size} Shadow Catalysts"
+                                allVirtues.isNotEmpty() -> "${allVirtues.size} Virtue Forces"
+                                else -> "Awaiting Selection"
+                            },
+                            fontSize = 10.sp,
+                            color = if (hasSelections) EtherealCyan else TextMuted,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    if (hasSelections) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            allShadows.forEach { sin ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(sin.colorHex).copy(alpha = 0.18f))
+                                        .border(0.6.dp, Color(sin.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${sin.runeSymbol} ${sin.displayName}",
+                                        fontSize = 10.5.sp,
+                                        color = Color(sin.colorHex),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+
+                            allVirtues.forEach { virtue ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(virtue.colorHex).copy(alpha = 0.18f))
+                                        .border(0.6.dp, Color(virtue.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${virtue.runeSymbol} ${virtue.displayName}",
+                                        fontSize = 10.5.sp,
+                                        color = Color(virtue.colorHex),
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Select one or more archetypal catalysts below to begin transmutation.",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+        }
+
         // 1. SEVEN DEADLY SINS SECTION
         if (selectedForceTab == 0 || selectedForceTab == 1) {
             item {
@@ -450,114 +557,7 @@ fun RecordScreen(
             }
         }
 
-        // 3. MINIMALISTIC CONFIRMATION & SYNTHESIS CARD
-        item {
-            val allShadows = if (formState.selectedShadows.isNotEmpty()) {
-                formState.selectedShadows
-            } else {
-                listOfNotNull(formState.primaryShadow).toSet()
-            }
-            val allVirtues = if (formState.selectedVirtues.isNotEmpty()) {
-                formState.selectedVirtues
-            } else {
-                listOfNotNull(formState.primaryVirtue).toSet()
-            }
-            val hasSelections = allShadows.isNotEmpty() || allVirtues.isNotEmpty()
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF0F0A1F))
-                    .border(1.dp, SurfaceCardBorder, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .testTag("transmutation_summary_card")
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(text = "✦", fontSize = 12.sp, color = RadiantGold)
-                            Text(
-                                text = "TRANSMUTATION MATRIX",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = RadiantGold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-
-                        Text(
-                            text = when {
-                                allShadows.isNotEmpty() && allVirtues.isNotEmpty() -> "${allShadows.size} Shadows • ${allVirtues.size} Virtues"
-                                allShadows.isNotEmpty() -> "${allShadows.size} Shadow Catalysts"
-                                allVirtues.isNotEmpty() -> "${allVirtues.size} Virtue Forces"
-                                else -> "Awaiting Selection"
-                            },
-                            fontSize = 10.sp,
-                            color = if (hasSelections) EtherealCyan else TextMuted,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    if (hasSelections) {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            allShadows.forEach { sin ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(sin.colorHex).copy(alpha = 0.18f))
-                                        .border(0.6.dp, Color(sin.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = "${sin.runeSymbol} ${sin.displayName}",
-                                        fontSize = 10.5.sp,
-                                        color = Color(sin.colorHex),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-
-                            allVirtues.forEach { virtue ->
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(virtue.colorHex).copy(alpha = 0.18f))
-                                        .border(0.6.dp, Color(virtue.colorHex).copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = "${virtue.runeSymbol} ${virtue.displayName}",
-                                        fontSize = 10.5.sp,
-                                        color = Color(virtue.colorHex),
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            text = "Select one or more archetypal catalysts above to begin transmutation.",
-                            fontSize = 11.sp,
-                            color = TextMuted
-                        )
-                    }
-                }
-            }
-        }
-
-        // 4. SUBMIT / TRANSMUTE BUTTON
+        // SUBMIT / TRANSMUTE BUTTON
         item {
             Button(
                 onClick = onSubmit,

@@ -20,10 +20,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Flare
+import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,11 +47,14 @@ import androidx.compose.ui.unit.sp
 import com.example.data.engine.SoulResonanceData
 import com.example.data.local.DailyTrialEntity
 import com.example.data.local.EvaluationRecordEntity
+import com.example.data.local.EvolutionEventEntity
 import com.example.data.model.SoulIdentity
 import com.example.ui.components.AstralEmotionalState
 import com.example.ui.components.DailyEmotionalCheckInCard
+import com.example.ui.components.GodlyPoeticFeedbackCard
 import com.example.ui.components.IdentityHeader
 import com.example.ui.components.OracleMessageCard
+import com.example.ui.components.SanctuaryLibraryCard
 import com.example.ui.components.SinVirtueBalanceVisualizer
 import com.example.ui.theme.CelestialAmethyst
 import com.example.ui.theme.CelestialAmethystLight
@@ -68,12 +72,16 @@ fun MainScreen(
     soul: SoulIdentity,
     trials: List<DailyTrialEntity>,
     records: List<EvaluationRecordEntity> = emptyList(),
+    events: List<EvolutionEventEntity> = emptyList(),
     resonance: SoulResonanceData? = null,
     checkedInEmotion: String? = null,
     isCheckedInToday: Boolean = false,
     onDailyCheckIn: (AstralEmotionalState) -> Unit = {},
     hasClaimableAchievements: Boolean = false,
     onNavigate: (ScreenTab) -> Unit,
+    onOpenRecord: () -> Unit = {},
+    onOpenLibrary: () -> Unit = {},
+    onArchiveCurrentEvolution: (String?) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onOpenAchievements: () -> Unit = {},
     onOpenWardrobe: () -> Unit = {},
@@ -269,30 +277,52 @@ fun MainScreen(
                     ) {
                         SanctuaryIconButton(
                             label = "Record",
-                            icon = Icons.Default.EditNote,
-                            glowColor = RadiantGold,
-                            onClick = { onNavigate(ScreenTab.RECORD) },
+                            icon = Icons.Default.Flare,
+                            glowColor = Color(0xFFF87171),
+                            onClick = onOpenRecord,
+                            modifier = Modifier.weight(1f),
                             testTag = "portal_record_button"
                         )
 
                         SanctuaryIconButton(
-                            label = "Trial",
-                            icon = Icons.Default.Psychology,
-                            glowColor = EtherealCyan,
-                            onClick = { onNavigate(ScreenTab.REFLECTION) },
-                            testTag = "portal_reflection_button"
+                            label = "Soul Matrix",
+                            icon = Icons.Default.SelfImprovement,
+                            glowColor = RadiantGold,
+                            onClick = { onNavigate(ScreenTab.SOUL) },
+                            modifier = Modifier.weight(1f),
+                            testTag = "portal_soul_button"
                         )
 
                         SanctuaryIconButton(
-                            label = "Soul History",
-                            icon = Icons.Default.History,
-                            glowColor = Color(0xFFF472B6),
-                            onClick = { onNavigate(ScreenTab.HISTORY) },
-                            testTag = "portal_history_button"
+                            label = "Library",
+                            icon = Icons.Default.AutoStories,
+                            glowColor = EtherealCyan,
+                            onClick = onOpenLibrary,
+                            modifier = Modifier.weight(1f),
+                            testTag = "portal_library_button"
+                        )
+
+                        SanctuaryIconButton(
+                            label = "Wardrobe",
+                            icon = Icons.Default.AutoAwesome,
+                            glowColor = CelestialAmethystLight,
+                            onClick = onOpenWardrobe,
+                            modifier = Modifier.weight(1f),
+                            testTag = "portal_wardrobe_button"
                         )
                     }
                 }
             }
+        }
+
+        // 3rd Card: Sanctuary Library Timeline (View Past Godly Evolutions & Save Snapshot)
+        item {
+            SanctuaryLibraryCard(
+                soul = soul,
+                events = events,
+                onArchiveCurrentEvolution = onArchiveCurrentEvolution,
+                onOpenFullLibrary = onOpenLibrary
+            )
         }
 
         // 3rd Card: Daily Emotional Check-In Sequence
@@ -309,6 +339,13 @@ fun MainScreen(
             OracleMessageCard(
                 soul = soul,
                 checkedInEmotion = checkedInEmotion
+            )
+        }
+
+        // Automated Godly Identity Poetic Feedback (Dynamic Reflection of Current Virtue/Sin Matrix)
+        item {
+            GodlyPoeticFeedbackCard(
+                soul = soul
             )
         }
 
@@ -389,23 +426,24 @@ private fun SanctuaryIconButton(
     icon: ImageVector,
     glowColor: Color,
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = 6.dp, vertical = 6.dp)
             .testTag(testTag)
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(50.dp)
                 .clip(CircleShape)
                 .background(glowColor.copy(alpha = 0.15f))
-                .border(1.dp, glowColor.copy(alpha = 0.5f), CircleShape),
+                .border(1.2.dp, glowColor.copy(alpha = 0.55f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -421,7 +459,8 @@ private fun SanctuaryIconButton(
             style = MaterialTheme.typography.labelSmall,
             color = TextPrimary,
             fontWeight = FontWeight.SemiBold,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            fontSize = 11.5.sp
         )
     }
 }

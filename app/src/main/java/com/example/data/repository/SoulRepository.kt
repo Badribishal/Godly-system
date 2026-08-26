@@ -247,6 +247,92 @@ class SoulRepository(private val soulDao: SoulDao) {
         }
     }
 
+    suspend fun archiveGodlyEvolution(customNote: String? = null): EvolutionEventEntity = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile()?.toSoulIdentity() ?: SoulIdentity.initial()
+        val count = soulDao.getRecordCount()
+        val dayNum = count + 1
+        val event = EvolutionEventEntity(
+            dayNumber = dayNum,
+            eventType = "GODLY_ARCHIVE",
+            title = "Godly Archive: ${profile.race} [${profile.currentTitle}]",
+            description = if (!customNote.isNullOrBlank()) {
+                customNote
+            } else {
+                "Preserved state of ${profile.race} ${profile.className} (${profile.alignment}). Dominant Forces: ${profile.dominantShadow.displayName} & ${profile.dominantVirtue.displayName}. Humanity: ${profile.humanity}%, Stability: ${profile.stability}%."
+            },
+            isUnknownEvent = false,
+            runeIcon = when (profile.race) {
+                "Ancient Dragon", "Dragonborn" -> "🐉"
+                "Angel", "Solar Seraph", "Celestial Angel" -> "🪽"
+                "Demon", "Archdemon", "Abyssal Demon" -> "🔥"
+                "Voidborn", "Astral Being" -> "🌌"
+                "Phoenix", "Phoenix Sovereign" -> "🦅"
+                "Fae", "Archfey" -> "✨"
+                "Kitsune", "Celestial Kitsune" -> "🦊"
+                "Titan", "Giant", "Primordial Titan", "Frost Titan" -> "⚡"
+                "Vampire Progenitor" -> "🩸"
+                "High Elf", "Elf", "Dark Elf", "Moon Elf" -> "🌿"
+                else -> "👑"
+            }
+        )
+        val id = soulDao.insertEvolutionEvent(event)
+        event.copy(id = id)
+    }
+
+    suspend fun recalculateIdentityDescription(): SoulIdentity = withContext(Dispatchers.IO) {
+        val current = soulDao.getSoulProfile()?.toSoulIdentity() ?: SoulIdentity.initial()
+        val allRecords = soulDao.getRecentRecords(10)
+        val recordCount = soulDao.getRecordCount()
+        val textCorpus = allRecords.joinToString(" ") { "${it.situation} ${it.reflection} ${it.emotion}" }
+
+        val matrixResult = PersonalityEvaluationEngine.calculateIdentityMatrix(
+            shadows = current.shadowScores,
+            virtues = current.virtueScores,
+            humanity = current.humanity,
+            stability = current.stability,
+            current = current,
+            recordCount = recordCount,
+            textCorpus = textCorpus
+        )
+
+        val newTitle = PersonalityEvaluationEngine.determineTitle(
+            race = matrixResult.race,
+            className = matrixResult.advancedClass ?: matrixResult.className,
+            dominantShadow = current.dominantShadow,
+            dominantVirtue = current.dominantVirtue,
+            humanity = current.humanity,
+            stability = current.stability
+        )
+
+        val strengths = PersonalityEvaluationEngine.generateStrengths(
+            current.dominantShadow,
+            current.dominantVirtue,
+            matrixResult.className,
+            matrixResult.race
+        )
+        val weaknesses = PersonalityEvaluationEngine.generateWeaknesses(
+            current.dominantShadow,
+            current.dominantVirtue,
+            current.stability,
+            current.humanity
+        )
+
+        val updated = current.copy(
+            race = matrixResult.race,
+            className = matrixResult.className,
+            advancedClass = matrixResult.advancedClass,
+            archetype = matrixResult.archetype,
+            element = matrixResult.element,
+            alignment = matrixResult.alignment,
+            possibleEvolution = matrixResult.possibleEvolution,
+            currentTitle = newTitle,
+            strengths = strengths,
+            weaknesses = weaknesses
+        )
+        soulDao.insertOrUpdateProfile(updated.toEntity())
+        updated
+    }
+
     suspend fun unlockCosmetic(effectId: String, cost: Int): Boolean = withContext(Dispatchers.IO) {
         val profile = soulDao.getSoulProfile() ?: return@withContext false
         val soul = profile.toSoulIdentity()

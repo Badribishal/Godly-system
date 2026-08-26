@@ -5,10 +5,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,10 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.PagerSnapDistance
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -60,7 +60,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AchievementsDialog
 import com.example.ui.components.AwakeningDialog
 import com.example.ui.components.CosmicParticlesCanvas
+import com.example.ui.components.SanctuaryLibraryDialog
 import com.example.ui.components.SettingsDialog
+import com.example.ui.components.SoulRecordDialog
 import com.example.ui.components.WardrobeDialog
 import com.example.ui.screens.history.HistoryScreen
 import com.example.ui.screens.main.MainScreen
@@ -107,6 +109,8 @@ fun GodlySystemApp(
     val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
     val showAchievementsDialog by viewModel.showAchievementsDialog.collectAsStateWithLifecycle()
     val showWardrobeDialog by viewModel.showWardrobeDialog.collectAsStateWithLifecycle()
+    val showRecordDialog by viewModel.showRecordDialog.collectAsStateWithLifecycle()
+    val showLibraryDialog by viewModel.showLibraryDialog.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val rarePalette by viewModel.rarePalette.collectAsStateWithLifecycle()
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
@@ -115,44 +119,6 @@ fun GodlySystemApp(
     val checkedInEmotion by viewModel.checkedInEmotion.collectAsStateWithLifecycle()
     val isCheckedInToday by viewModel.isCheckedInToday.collectAsStateWithLifecycle()
     val systemToast by viewModel.systemToast.collectAsStateWithLifecycle()
-
-    val tabs = remember {
-        listOf(
-            ScreenTab.MAIN,
-            ScreenTab.SOUL,
-            ScreenTab.RECORD,
-            ScreenTab.REFLECTION,
-            ScreenTab.HISTORY
-        )
-    }
-
-    val coroutineScope = rememberCoroutineScope()
-    val pagerState = rememberPagerState(
-        initialPage = tabs.indexOf(currentTab).coerceAtLeast(0),
-        pageCount = { tabs.size }
-    )
-
-    // Synchronize programmatic tab changes smoothly into the continuous vertical pager
-    LaunchedEffect(currentTab) {
-        val targetIndex = tabs.indexOf(currentTab)
-        if (targetIndex >= 0 && pagerState.currentPage != targetIndex && !pagerState.isScrollInProgress) {
-            pagerState.animateScrollToPage(
-                page = targetIndex,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            )
-        }
-    }
-
-    // Synchronize natural gesture drag / swipe changes back to the ViewModel state
-    LaunchedEffect(pagerState.currentPage) {
-        val newTab = tabs.getOrNull(pagerState.currentPage) ?: ScreenTab.MAIN
-        if (currentTab != newTab) {
-            viewModel.setTab(newTab)
-        }
-    }
 
     val hasClaimableAchievements = remember(achievements, dailyLoginState) {
         !dailyLoginState.isClaimedToday || achievements.any { it.isUnlocked && !it.isClaimed }
@@ -164,12 +130,6 @@ fun GodlySystemApp(
             viewModel.clearSystemToast()
         }
     }
-
-    val flingBehavior = PagerDefaults.flingBehavior(
-        state = pagerState,
-        pagerSnapDistance = PagerSnapDistance.atMost(1),
-        snapPositionalThreshold = 0.20f // Short swipe threshold (20%) responsive tracking; prevents accidental triggers from tiny movements
-    )
 
     Box(
         modifier = Modifier
@@ -189,41 +149,40 @@ fun GodlySystemApp(
                     currentTab = currentTab,
                     onSelectTab = { tab ->
                         viewModel.setTab(tab)
-                        val targetIndex = tabs.indexOf(tab)
-                        if (targetIndex >= 0) {
-                            coroutineScope.launch {
-                                pagerState.animateScrollToPage(
-                                    page = targetIndex,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                        stiffness = Spring.StiffnessMediumLow
-                                    )
-                                )
-                            }
-                        }
                     }
                 )
             }
         ) { paddingValues ->
-            VerticalPager(
-                state = pagerState,
+            AnimatedContent(
+                targetState = currentTab,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(420, easing = FastOutSlowInEasing)) +
+                        scaleIn(initialScale = 0.96f, animationSpec = tween(420, easing = FastOutSlowInEasing)))
+                        .togetherWith(
+                            fadeOut(animationSpec = tween(320, easing = FastOutSlowInEasing)) +
+                            scaleOut(targetScale = 1.04f, animationSpec = tween(320, easing = FastOutSlowInEasing))
+                        )
+                },
+                label = "mystical_screen_crossfade",
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
-                flingBehavior = flingBehavior,
-                key = { pageIndex -> tabs[pageIndex].name }
-            ) { pageIndex ->
-                when (tabs[pageIndex]) {
+                    .padding(paddingValues)
+            ) { targetTab ->
+                when (targetTab) {
                     ScreenTab.MAIN -> MainScreen(
                         soul = soulProfile,
                         trials = dailyTrials,
                         records = records,
+                        events = evolutionEvents,
                         resonance = soulResonance,
                         checkedInEmotion = checkedInEmotion,
                         isCheckedInToday = isCheckedInToday,
                         onDailyCheckIn = { viewModel.performDailyEmotionalCheckIn(it) },
                         hasClaimableAchievements = hasClaimableAchievements,
                         onNavigate = { viewModel.setTab(it) },
+                        onOpenRecord = { viewModel.openRecordDialog() },
+                        onOpenLibrary = { viewModel.openLibraryDialog() },
+                        onArchiveCurrentEvolution = { note -> viewModel.archiveGodlyEvolution(note) },
                         onOpenSettings = { viewModel.openSettings() },
                         onOpenAchievements = { viewModel.openAchievements() },
                         onOpenWardrobe = { viewModel.openWardrobe() }
@@ -231,30 +190,37 @@ fun GodlySystemApp(
                     ScreenTab.SOUL -> SoulScreen(
                         soul = soulProfile,
                         onBack = { viewModel.setTab(ScreenTab.MAIN) },
-                        onOpenWardrobe = { viewModel.openWardrobe() },
-                        onOpenHistory = { viewModel.setTab(ScreenTab.HISTORY) }
-                    )
-                    ScreenTab.RECORD -> RecordScreen(
-                        formState = recordFormState,
-                        onFormUpdate = { viewModel.updateRecordForm(it) },
-                        onSubmit = { viewModel.submitRecord() },
-                        onBack = { viewModel.setTab(ScreenTab.MAIN) }
-                    )
-                    ScreenTab.REFLECTION -> ReflectionScreen(
-                        trials = dailyTrials,
-                        onCompleteTrial = { trial, index, reflection ->
-                            viewModel.submitTrial(trial, index, reflection)
-                        },
-                        onBack = { viewModel.setTab(ScreenTab.MAIN) }
-                    )
-                    ScreenTab.HISTORY -> HistoryScreen(
-                        events = evolutionEvents,
-                        records = records,
-                        soul = soulProfile,
-                        onBack = { viewModel.setTab(ScreenTab.MAIN) }
+                        onOpenWardrobe = { viewModel.openWardrobe() }
                     )
                 }
             }
+        }
+
+        // Sanctuary Library Dialog (Full Codex)
+        if (showLibraryDialog) {
+            SanctuaryLibraryDialog(
+                soul = soulProfile,
+                events = evolutionEvents,
+                onArchiveCurrentEvolution = { note -> viewModel.archiveGodlyEvolution(note) },
+                onDismiss = { viewModel.closeLibraryDialog() }
+            )
+        }
+
+        // Soul Record / Seven Sins & Seven Virtues Alchemical Calibration Dialog
+        if (showRecordDialog) {
+            SoulRecordDialog(
+                initialShadows = recordFormState.selectedShadows,
+                initialVirtues = recordFormState.selectedVirtues,
+                onSubmit = { shadows, virtues, sit, ref ->
+                    viewModel.submitForcesRecord(
+                        selectedShadows = shadows,
+                        selectedVirtues = virtues,
+                        situation = sit,
+                        reflection = ref
+                    )
+                },
+                onDismiss = { viewModel.closeRecordDialog() }
+            )
         }
 
         // Settings Dialog (Theme Mode, Rare Color Combos, Multi-Format Export/Import)
@@ -315,13 +281,13 @@ fun PillowBottomNavigationBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 24.dp, vertical = 10.dp)
             .windowInsetsPadding(WindowInsets.navigationBars),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.9f)
                 .height(60.dp)
                 .clip(RoundedCornerShape(30.dp))
                 .border(
@@ -337,7 +303,7 @@ fun PillowBottomNavigationBar(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -352,33 +318,9 @@ fun PillowBottomNavigationBar(
                 PillowNavItem(
                     selected = currentTab == ScreenTab.SOUL,
                     icon = Icons.Default.SelfImprovement,
-                    label = "Soul",
+                    label = "Soul Matrix",
                     onClick = { onSelectTab(ScreenTab.SOUL) },
                     testTag = "nav_soul"
-                )
-
-                PillowNavItem(
-                    selected = currentTab == ScreenTab.RECORD,
-                    icon = Icons.Default.Flare,
-                    label = "Record",
-                    onClick = { onSelectTab(ScreenTab.RECORD) },
-                    testTag = "nav_record"
-                )
-
-                PillowNavItem(
-                    selected = currentTab == ScreenTab.REFLECTION,
-                    icon = Icons.Default.AutoStories,
-                    label = "Trials",
-                    onClick = { onSelectTab(ScreenTab.REFLECTION) },
-                    testTag = "nav_reflection"
-                )
-
-                PillowNavItem(
-                    selected = currentTab == ScreenTab.HISTORY,
-                    icon = Icons.Default.History,
-                    label = "Chronicle",
-                    onClick = { onSelectTab(ScreenTab.HISTORY) },
-                    testTag = "nav_history"
                 )
             }
         }
@@ -395,7 +337,7 @@ private fun PillowNavItem(
 ) {
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(
                 if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
                 else Color.Transparent
@@ -403,33 +345,30 @@ private fun PillowNavItem(
             .border(
                 width = if (selected) 1.dp else 0.dp,
                 color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Transparent,
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(22.dp)
             )
             .clickable { onClick() }
-            .padding(horizontal = if (selected) 10.dp else 6.dp, vertical = 6.dp)
+            .padding(horizontal = 18.dp, vertical = 8.dp)
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
             )
-            if (selected) {
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = label,
+                fontSize = 12.5.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

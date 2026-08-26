@@ -38,10 +38,7 @@ import java.util.Locale
 
 enum class ScreenTab {
     MAIN,
-    RECORD,
-    SOUL,
-    REFLECTION,
-    HISTORY
+    SOUL
 }
 
 enum class ExportFormat(val extension: String, val displayName: String, val mimeType: String, val defaultFilename: String, val isBinary: Boolean = false) {
@@ -93,6 +90,12 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _showWardrobeDialog = MutableStateFlow(false)
     val showWardrobeDialog: StateFlow<Boolean> = _showWardrobeDialog.asStateFlow()
+
+    private val _showRecordDialog = MutableStateFlow(false)
+    val showRecordDialog: StateFlow<Boolean> = _showRecordDialog.asStateFlow()
+
+    private val _showLibraryDialog = MutableStateFlow(false)
+    val showLibraryDialog: StateFlow<Boolean> = _showLibraryDialog.asStateFlow()
 
     private val _showAwakeningModal = MutableStateFlow(false)
     val showAwakeningModal: StateFlow<Boolean> = _showAwakeningModal.asStateFlow()
@@ -248,6 +251,91 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeWardrobe() {
         _showWardrobeDialog.value = false
+    }
+
+    fun openRecordDialog() {
+        _showRecordDialog.value = true
+    }
+
+    fun closeRecordDialog() {
+        _showRecordDialog.value = false
+    }
+
+    fun openLibraryDialog() {
+        _showLibraryDialog.value = true
+    }
+
+    fun closeLibraryDialog() {
+        _showLibraryDialog.value = false
+    }
+
+    fun archiveGodlyEvolution(customNote: String? = null) {
+        viewModelScope.launch {
+            val event = repository.archiveGodlyEvolution(customNote)
+            _systemToast.value = "✦ Godly Evolution [${event.title}] archived in Sanctuary Library!"
+            refreshAchievements()
+        }
+    }
+
+    fun recalculateGodlyIdentity() {
+        viewModelScope.launch {
+            val updated = repository.recalculateIdentityDescription()
+            _systemToast.value = "✦ Godly Identity [${updated.race}: ${updated.currentTitle}] re-calculated from recent inputs."
+            refreshAchievements()
+        }
+    }
+
+    fun submitForcesRecord(
+        selectedShadows: Set<ShadowType>,
+        selectedVirtues: Set<VirtueType>,
+        situation: String = "",
+        reflection: String = ""
+    ) {
+        val shadowNames = selectedShadows.joinToString(", ") { it.displayName }
+        val virtueNames = selectedVirtues.joinToString(", ") { it.displayName }
+
+        val emotionLabel = if (shadowNames.isNotBlank() && virtueNames.isNotBlank()) {
+            "Transmutation: $shadowNames & $virtueNames"
+        } else if (shadowNames.isNotBlank()) {
+            "Shadow Mastery: $shadowNames"
+        } else if (virtueNames.isNotBlank()) {
+            "Sacred Virtues: $virtueNames"
+        } else {
+            "Conscious Duality Alignment"
+        }
+
+        viewModelScope.launch {
+            val input = RecordInput(
+                emotion = emotionLabel,
+                primaryShadow = selectedShadows.firstOrNull(),
+                primaryVirtue = selectedVirtues.firstOrNull(),
+                situation = situation.ifBlank {
+                    if (shadowNames.isNotBlank() && virtueNames.isNotBlank()) {
+                        "Calibrated inner dualities across 7 Sins [$shadowNames] and 7 Virtues [$virtueNames]."
+                    } else if (shadowNames.isNotBlank()) {
+                        "Directly channeled shadow forces: $shadowNames."
+                    } else if (virtueNames.isNotBlank()) {
+                        "Directly cultivated sacred heavenly virtues: $virtueNames."
+                    } else {
+                        "Balanced vessel harmonic resonance in the Sanctuary."
+                    }
+                },
+                intention = "Calculated seven deadly sins and seven heavenly virtues to define godly evolution.",
+                action = "Infused cosmic alchemy into the soul matrix.",
+                consequence = "Identity metrics calibrated; humanity & stability harmonics restructured.",
+                reflection = reflection.ifBlank { "The soul harmonizes light and shadow into sovereign mastery." }
+            )
+
+            val result = repository.recordEvaluation(input)
+            _lastEvaluationResult.value = result
+            _showAwakeningModal.value = true
+            _showRecordDialog.value = false
+
+            // Clear draft and reset
+            repository.clearEvaluationDraft()
+            _recordFormState.value = RecordFormState()
+            refreshAchievements()
+        }
     }
 
     fun setThemeMode(mode: AppThemeMode) {

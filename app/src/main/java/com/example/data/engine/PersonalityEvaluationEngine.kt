@@ -321,7 +321,7 @@ object PersonalityEvaluationEngine {
         return Pair(updatedIdentity, result)
     }
 
-    private data class IdentityMatrixResult(
+    internal data class IdentityMatrixResult(
         val race: String,
         val className: String,
         val advancedClass: String?,
@@ -333,7 +333,7 @@ object PersonalityEvaluationEngine {
         val secretAwakened: Boolean
     )
 
-    private fun calculateIdentityMatrix(
+    internal fun calculateIdentityMatrix(
         shadows: Map<ShadowType, Int>,
         virtues: Map<VirtueType, Int>,
         humanity: Int,
@@ -630,7 +630,7 @@ object PersonalityEvaluationEngine {
         )
     }
 
-    private fun determineTitle(
+    internal fun determineTitle(
         race: String,
         className: String,
         dominantShadow: ShadowType,
@@ -652,7 +652,7 @@ object PersonalityEvaluationEngine {
         }
     }
 
-    private fun generateStrengths(
+    internal fun generateStrengths(
         shadow: ShadowType,
         virtue: VirtueType,
         className: String,
@@ -681,7 +681,7 @@ object PersonalityEvaluationEngine {
         return list
     }
 
-    private fun generateWeaknesses(
+    internal fun generateWeaknesses(
         shadow: ShadowType,
         virtue: VirtueType,
         stability: Int,
