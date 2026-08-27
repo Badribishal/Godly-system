@@ -49,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -81,6 +80,7 @@ import com.example.ui.theme.TextSecondary
 fun IdentityHeader(
     soul: SoulIdentity,
     resonance: SoulResonanceData? = null,
+    onOpenArchetypes: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMilestonesDialog by remember { mutableStateOf(false) }
@@ -88,24 +88,37 @@ fun IdentityHeader(
         IdentityMilestoneCatalog.evaluateMilestones(soul, emptyList(), emptyList())
     }
     val unlockedCount = badges.count { it.isUnlocked }
-    val infiniteTransition = rememberInfiniteTransition(label = "soul_aura")
-    val auraPulse by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "aura_pulse"
-    )
+
+    val currentTier = remember(soul.soulLevel) {
+        com.example.data.engine.MatrixTier.fromLevel(soul.soulLevel)
+    }
+    val currentArchetype = remember(soul.attunedArchetypeId) {
+        com.example.data.model.AdvancedArchetypesCatalog.getArchetypeById(soul.attunedArchetypeId)
+    }
+    val maxExp = remember(soul.soulLevel) {
+        com.example.data.engine.SoulProgressionEngine.expRequiredForLevel(soul.soulLevel)
+    }
+    val expProgress = (soul.soulExp.toFloat() / maxExp.toFloat()).coerceIn(0f, 1f)
+
+    val infiniteTransition = rememberInfiniteTransition(label = "soul_matrix_aura")
     val glowAlpha by infiniteTransition.animateFloat(
         initialValue = 0.35f,
-        targetValue = 0.75f,
+        targetValue = 0.85f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2600, easing = FastOutSlowInEasing),
+            animation = tween(2800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "glow_alpha"
+    )
+
+    val wavePulse by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wave_pulse"
     )
 
     val evolutionProgressAnimated by animateFloatAsState(
@@ -120,41 +133,49 @@ fun IdentityHeader(
         label = "humanity"
     )
 
-    val resonancePercent = resonance?.percentage ?: 72
+    val resonancePercent = resonance?.percentage ?: ((soul.stability + soul.humanity) / 2).coerceIn(10, 100)
     val resonanceAnimated by animateFloatAsState(
         targetValue = resonancePercent.toFloat() / 100f,
         animationSpec = tween(700),
         label = "resonance_anim"
     )
 
+    // Calculate Duality Balance
+    val shadowScore = soul.shadowScores[soul.dominantShadow] ?: 30
+    val virtueScore = soul.virtueScores[soul.dominantVirtue] ?: 30
+    val totalForces = (shadowScore + virtueScore).coerceAtLeast(1)
+    val virtueRatio = (virtueScore.toFloat() / totalForces).coerceIn(0.1f, 0.9f)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        SurfaceCardElevated,
-                        SurfaceCard
+                        Color(0xFF140D2B),
+                        Color(0xFF0D081D),
+                        Color(0xFF070410)
                     )
                 )
             )
             .border(
-                width = 1.2.dp,
+                width = 1.4.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        RadiantGold.copy(alpha = glowAlpha),
-                        CelestialAmethyst.copy(alpha = 0.4f),
+                        RadiantGoldBright.copy(alpha = glowAlpha),
+                        CelestialAmethyst.copy(alpha = 0.6f),
+                        EtherealCyan.copy(alpha = 0.4f),
                         SurfaceCardBorder
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(24.dp)
             )
             .padding(18.dp)
             .testTag("identity_header")
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // Header Top: System Label & Alignment Badge
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Top Bar: System Sigil, Classification & Alignment Pill
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -164,181 +185,103 @@ fun IdentityHeader(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "System Sigil",
-                        tint = RadiantGold,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(RadiantGold.copy(alpha = 0.18f))
+                            .border(1.dp, RadiantGold.copy(alpha = 0.5f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Cosmic Sigil",
+                            tint = RadiantGoldBright,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                     Text(
-                        text = "VESSEL CLASSIFICATION",
+                        text = "VESSEL ASTRAL MATRIX",
                         style = MaterialTheme.typography.labelMedium,
-                        color = RadiantGold,
+                        color = RadiantGoldBright,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 1.6.sp
                     )
                 }
 
+                // Alignment Badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF261D47))
-                        .border(1.dp, CelestialAmethyst.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color(0xFF261D47),
+                                    Color(0xFF3B1E54)
+                                )
+                            )
+                        )
+                        .border(1.dp, CelestialAmethyst.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = soul.alignment,
-                        color = TextAmethyst,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-
-            // Current Title
-            Text(
-                text = "« ${soul.currentTitle} »",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextGold,
-                fontFamily = FontFamily.Serif,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            // Race & Class Prominent Display
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = soul.race.uppercase(),
-                        style = MaterialTheme.typography.displayMedium,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = soul.advancedClass ?: soul.className,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = CelestialAmethystLight,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                // Element Sigil Crest with Equipped Cosmetic Visual Aura
-                CosmeticAvatarCrest(
-                    race = soul.race,
-                    equippedEffectId = soul.equippedEffectId
-                )
-            }
-
-            // Elemental Alignment & Archetype
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF0F0B1E).copy(alpha = 0.7f))
-                    .border(0.5.dp, EtherealCyan.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Elemental Alignment:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted,
-                    fontSize = 11.sp
-                )
-                Text(
-                    text = soul.element,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = EtherealCyan,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            // Dominant Forces Highlights with subtle glowing badges
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF0D0A18))
-                    .border(1.dp, SurfaceCardBorder, RoundedCornerShape(14.dp))
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Dominant Shadow (Sin)
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(
-                        text = "DOMINANT SHADOW",
-                        fontSize = 9.sp,
-                        color = Color(0xFFEF4444).copy(alpha = 0.8f),
+                        text = soul.alignment.uppercase(),
+                        color = TextGold,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = soul.dominantShadow.runeSymbol,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = soul.dominantShadow.displayName,
-                            fontSize = 13.sp,
-                            color = Color(soul.dominantShadow.colorHex),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .height(30.dp)
-                        .width(1.dp)
-                        .background(SurfaceCardBorder)
-                )
-
-                // Dominant Virtue
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = "DOMINANT VIRTUE",
-                        fontSize = 9.sp,
-                        color = RadiantGold.copy(alpha = 0.8f),
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.8.sp
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(
-                            text = soul.dominantVirtue.displayName,
-                            fontSize = 13.sp,
-                            color = Color(soul.dominantVirtue.colorHex),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = soul.dominantVirtue.runeSymbol,
-                            fontSize = 14.sp
-                        )
-                    }
                 }
             }
 
-            // SOUL RESONANCE METRIC & PROGRESS BAR
+            // Grand Title Banner
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFF0A0716))
-                    .border(0.8.dp, EtherealCyan.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                    .padding(10.dp)
-                    .testTag("soul_resonance_meter")
+                    .background(Color(0xFF1B1438).copy(alpha = 0.75f))
+                    .border(0.8.dp, RadiantGold.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "« ${soul.currentTitle} »",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = RadiantGoldBright,
+                    fontFamily = FontFamily.Serif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            // REDESIGNED SOUL MATRIX PROGRESSION & ARCHETYPE CARD
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(
+                        1.2.dp,
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(currentTier.colorHex).copy(alpha = 0.8f),
+                                RadiantGold.copy(alpha = 0.5f),
+                                CelestialAmethyst.copy(alpha = 0.4f)
+                            )
+                        ),
+                        RoundedCornerShape(18.dp)
+                    )
+                    .clickable(enabled = onOpenArchetypes != null) { onOpenArchetypes?.invoke() }
+                    .testTag("soul_progression_card"),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0F091F)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header: Level Badge, Tier Title, Attuned Archetype Pill
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -346,25 +289,361 @@ fun IdentityHeader(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                color = Color(currentTier.colorHex).copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(currentTier.colorHex))
+                            ) {
+                                Text(
+                                    text = "LV. ${soul.soulLevel}",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(currentTier.colorHex),
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "Tier ${currentTier.romanNumeral}: ${currentTier.title}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${soul.soulExp} / $maxExp EXP",
+                                    fontSize = 10.sp,
+                                    color = EtherealCyan,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
+                        // Attuned Archetype Pill
+                        Surface(
+                            color = Color(currentArchetype.accentColorHex).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(currentArchetype.accentColorHex).copy(alpha = 0.7f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = currentArchetype.sigilIcon, fontSize = 12.sp)
+                                Text(
+                                    text = currentArchetype.name,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(currentArchetype.accentColorHex)
+                                )
+                            }
+                        }
+                    }
+
+                    // Linear Soul Experience Progress Bar
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { expProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = Color(currentTier.colorHex),
+                        trackColor = Color(0xFF1B132C)
+                    )
+
+                    // Passive Boon Summary & Archetype Codex CTA
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "✦ Boon: ${currentArchetype.passivePerk}",
+                            fontSize = 10.5.sp,
+                            color = CelestialAmethystLight,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        if (onOpenArchetypes != null) {
+                            Text(
+                                text = "Archetype Matrix ›",
+                                fontSize = 11.sp,
+                                color = RadiantGoldBright,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Main Vessel Showcase: Avatar Crest, Race, Class & Element
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = soul.race.uppercase(),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Serif,
+                        letterSpacing = 0.5.sp
+                    )
+                    Text(
+                        text = soul.advancedClass ?: soul.className,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = CelestialAmethystLight,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    // Elemental & Dynamic Theme Badge
+                    val archTheme = com.example.ui.theme.LocalArchetypeTheme.current
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF0F172A).copy(alpha = 0.8f))
+                                .border(0.6.dp, archTheme.primary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(text = "Affinity:", fontSize = 10.sp, color = TextMuted)
+                            Text(
+                                text = soul.element,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = archTheme.primary
+                            )
+                        }
+
+                        Surface(
+                            color = archTheme.primary.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(0.6.dp, archTheme.primary.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = if (archTheme.isWarm) "🔥 Warm Palette" else if (archTheme.isCoolEthereal) "✨ Cool Ethereal" else "🌿 Primordial",
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = archTheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Interactive Avatar Crest with Visual Cosmic Aura
+                CosmeticAvatarCrest(
+                    race = soul.race,
+                    equippedEffectId = soul.equippedEffectId
+                )
+            }
+
+            // REDESIGNED DUAL FORCES ALCHEMICAL CORE (Dominant Shadow vs Virtue)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, SurfaceCardBorder, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0716))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Dominant Shadow Column
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "DOMINANT SHADOW",
+                                fontSize = 8.5.sp,
+                                color = Color(0xFFF87171),
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(text = soul.dominantShadow.runeSymbol, fontSize = 14.sp)
+                                Text(
+                                    text = soul.dominantShadow.displayName,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(soul.dominantShadow.colorHex)
+                                )
+                                Text(
+                                    text = "($shadowScore)",
+                                    fontSize = 10.5.sp,
+                                    color = TextMuted
+                                )
+                            }
+                        }
+
+                        // Alchemical Equilibrium Emblem
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF1E1538))
+                                .border(0.8.dp, RadiantGold.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = "⚖️", fontSize = 12.sp)
+                        }
+
+                        // Dominant Virtue Column
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "DOMINANT VIRTUE",
+                                fontSize = 8.5.sp,
+                                color = RadiantGoldBright,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "($virtueScore)",
+                                    fontSize = 10.5.sp,
+                                    color = TextMuted
+                                )
+                                Text(
+                                    text = soul.dominantVirtue.displayName,
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(soul.dominantVirtue.colorHex)
+                                )
+                                Text(text = soul.dominantVirtue.runeSymbol, fontSize = 14.sp)
+                            }
+                        }
+                    }
+
+                    // Duality Balance Track Bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF140D24))
+                    ) {
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            // Shadow portion
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f - virtueRatio)
+                                    .fillMaxHeight()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                Color(0xFF991B1B),
+                                                Color(0xFFEF4444)
+                                            )
+                                        )
+                                    )
+                            )
+                            // Virtue portion
+                            Box(
+                                modifier = Modifier
+                                    .weight(virtueRatio)
+                                    .fillMaxHeight()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            colors = listOf(
+                                                RadiantGold,
+                                                RadiantGoldBright
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "${((1f - virtueRatio) * 100).toInt()}% Shadow Force",
+                            fontSize = 9.sp,
+                            color = Color(0xFFF87171)
+                        )
+                        Text(
+                            text = "${(virtueRatio * 100).toInt()}% Virtue Force",
+                            fontSize = 9.sp,
+                            color = RadiantGoldBright
+                        )
+                    }
+                }
+            }
+
+            // SOUL RESONANCE AUDIO-WAVEFORM METER
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF090615))
+                    .border(0.8.dp, EtherealCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                    .padding(12.dp)
+                    .testTag("soul_resonance_meter")
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.GraphicEq,
-                                contentDescription = "Resonance Wave",
+                                contentDescription = "Resonance Waveform",
                                 tint = EtherealCyan,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                             Text(
-                                text = "Soul Resonance:",
+                                text = "SOUL RESONANCE:",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = EtherealCyan,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "$resonancePercent%",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color.White,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.ExtraBold
                             )
                         }
 
@@ -372,38 +651,45 @@ fun IdentityHeader(
                             text = resonance?.frequencyLabel ?: "528 Hz • Miraculous Harmony",
                             style = MaterialTheme.typography.labelSmall,
                             color = CelestialAmethystLight,
-                            fontSize = 10.sp
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium
                         )
                     }
 
-                    // Resonance Progress Bar
-                    Box(
+                    // Equalizer Audio Bars Visualizer Simulation
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(7.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF030A14))
-                            .border(0.5.dp, EtherealCyan.copy(alpha = 0.2f), CircleShape)
+                            .height(14.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF040A14))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(resonanceAnimated.coerceIn(0.02f, 1.0f))
-                                .fillMaxHeight()
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.horizontalGradient(
-                                        colors = listOf(
-                                            Color(0xFF0284C7),
-                                            Color(0xFF06B6D4),
-                                            Color(0xFF38BDF8)
+                        val barHeights = listOf(0.4f, 0.7f, 0.5f, 0.9f, 0.6f, 0.85f, 1.0f, 0.75f, 0.95f, 0.6f, 0.8f, 0.5f, 0.7f, 0.4f)
+                        barHeights.forEachIndexed { idx, h ->
+                            val dynamicHeight = (h * (if (idx % 2 == 0) wavePulse else (1.6f - wavePulse))).coerceIn(0.2f, 1f)
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(dynamicHeight)
+                                    .padding(horizontal = 1.dp)
+                                    .clip(RoundedCornerShape(2.dp))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                EtherealCyan,
+                                                Color(0xFF0284C7)
+                                            )
                                         )
                                     )
-                                )
-                        )
+                            )
+                        }
                     }
 
                     Text(
-                        text = resonance?.resonanceInsight ?: "Synchronized with ${soul.dominantVirtue.displayName} & ${soul.dominantShadow.displayName}.",
+                        text = resonance?.resonanceInsight ?: "The vessel vibrates in harmony with ${soul.dominantVirtue.displayName} & ${soul.dominantShadow.displayName}.",
                         fontSize = 10.5.sp,
                         color = TextMuted,
                         lineHeight = 14.sp
@@ -411,114 +697,121 @@ fun IdentityHeader(
                 }
             }
 
-            // Humanity & Evolution Progress Bars
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // HUMANITY & METAMORPHOSIS PROGRESS METERS
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Humanity Meter
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Humanity Tether",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = "${soul.humanity}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (soul.humanity > 50) Color(0xFF34D399) else Color(0xFFA78BFA),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0F0B1E))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(humanityAnimated.coerceIn(0.02f, 1.0f))
-                            .fillMaxHeight()
-                            .clip(CircleShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color(0xFF10B981),
-                                        Color(0xFF34D399)
-                                    )
-                                )
-                            )
-                    )
-                }
-
-                // Evolution Progress Meter
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Metamorphic Awakening:",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = RadiantGoldBright
+                            text = "Humanity Tether (Mortal Grounding)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
                         )
                         Text(
-                            text = "${soul.evolutionProgress}%",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = RadiantGold,
+                            text = "${soul.humanity}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (soul.humanity > 50) Color(0xFF34D399) else Color(0xFFA78BFA),
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Text(
-                        text = "Next: ${soul.possibleEvolution}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextAmethyst
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(7.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF0F0B1E))
-                        .border(0.5.dp, RadiantGold.copy(alpha = 0.3f), CircleShape)
-                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(evolutionProgressAnimated.coerceIn(0.02f, 1.0f))
-                            .fillMaxHeight()
+                            .fillMaxWidth()
+                            .height(6.dp)
                             .clip(CircleShape)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        RadiantGoldDim,
-                                        RadiantGold,
-                                        CelestialAmethystLight
+                            .background(Color(0xFF110C24))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(humanityAnimated.coerceIn(0.02f, 1.0f))
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFF059669),
+                                            Color(0xFF10B981),
+                                            Color(0xFF34D399)
+                                        )
                                     )
                                 )
-                            )
-                    )
+                        )
+                    }
                 }
 
-                // IDENTITY MILESTONE BADGES RIBBON (Long-Term Persona Development Rewards)
+                // Metamorphic Awakening Meter
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Metamorphic Awakening:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = RadiantGoldBright
+                            )
+                            Text(
+                                text = "${soul.evolutionProgress}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = RadiantGold,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "Next: ${soul.possibleEvolution}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CelestialAmethystLight,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF110C24))
+                            .border(0.6.dp, RadiantGold.copy(alpha = 0.35f), CircleShape)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(evolutionProgressAnimated.coerceIn(0.02f, 1.0f))
+                                .fillMaxHeight()
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            RadiantGoldDim,
+                                            RadiantGold,
+                                            RadiantGoldBright,
+                                            CelestialAmethystLight
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                }
+
+                // IDENTITY MILESTONE BADGES RIBBON
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF0D0820))
-                        .border(0.8.dp, RadiantGold.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .background(Color(0xFF120B28))
+                        .border(0.8.dp, RadiantGold.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
                         .clickable { showMilestonesDialog = true }
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .testTag("identity_milestones_ribbon")
                 ) {
                     Row(
@@ -533,14 +826,14 @@ fun IdentityHeader(
                             Icon(
                                 imageVector = Icons.Default.MilitaryTech,
                                 contentDescription = "Milestone Badges",
-                                tint = RadiantGold,
+                                tint = RadiantGoldBright,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = "Milestone Badges:",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = RadiantGold
+                                color = RadiantGoldBright
                             )
                             Text(
                                 text = "$unlockedCount / ${badges.size} Unlocked",
@@ -559,8 +852,8 @@ fun IdentityHeader(
                                 Text(text = badge.runeIcon, fontSize = 13.sp)
                             }
                             Text(
-                                text = "View ❯",
-                                fontSize = 10.sp,
+                                text = "Inspect ❯",
+                                fontSize = 10.5.sp,
                                 color = CelestialAmethystLight,
                                 fontWeight = FontWeight.Bold
                             )
@@ -605,7 +898,7 @@ fun IdentityHeader(
                                     text = "IDENTITY MILESTONES",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = RadiantGold,
+                                    color = RadiantGoldBright,
                                     fontFamily = FontFamily.Serif
                                 )
                                 Text(

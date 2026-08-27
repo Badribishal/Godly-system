@@ -54,7 +54,6 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.model.ShadowType
 import com.example.data.model.SoulIdentity
 import com.example.data.model.VirtueType
-import com.example.ui.components.GodlyPoeticFeedbackCard
 import com.example.ui.components.IdentityHeader
 import com.example.ui.components.ShadowItemRow
 import com.example.ui.components.SoulRadarChart
@@ -79,6 +78,7 @@ fun SoulScreen(
     onBack: () -> Unit,
     onOpenWardrobe: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
+    onOpenArchetypes: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Shadows, 1: Virtues, 2: Evolution Matrix
@@ -153,12 +153,10 @@ fun SoulScreen(
 
         // Identity Card
         item {
-            IdentityHeader(soul = soul)
-        }
-
-        // Automated Godly Identity Poetic Reflection
-        item {
-            GodlyPoeticFeedbackCard(soul = soul)
+            IdentityHeader(
+                soul = soul,
+                onOpenArchetypes = onOpenArchetypes
+            )
         }
 
         // Radar Visualization Card
@@ -300,6 +298,10 @@ fun SoulScreen(
                     ArchetypeTraitsCard(soul = soul)
                 }
             }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 

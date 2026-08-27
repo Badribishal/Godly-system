@@ -9,7 +9,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 @Composable
 fun MyApplicationTheme(
     themeMode: AppThemeMode = AppThemeMode.AUTO,
-    palette: RarePalette = RarePalette.CELESTIAL_TWILIGHT,
+    palette: RarePalette = RarePalette.ARCHETYPE_RESONANCE,
+    soul: com.example.data.model.SoulIdentity? = null,
     content: @Composable () -> Unit
 ) {
     val isSystemDark = isSystemInDarkTheme()
@@ -19,15 +20,17 @@ fun MyApplicationTheme(
         AppThemeMode.LIGHT -> false
     }
 
-    val colorScheme = DynamicThemeBuilder.buildColorScheme(palette, isDark)
+    val archetypeProfile = ArchetypeThemeEngine.getThemeForSoul(soul)
+    val colorScheme = DynamicThemeBuilder.buildColorScheme(palette, isDark, soul)
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography
     ) {
-        // Enforce default bodyMedium text style with zero font-padding and centered alignment
+        // Enforce default bodyMedium text style and provide ambient active archetype profile
         CompositionLocalProvider(
-            LocalTextStyle provides Typography.bodyMedium
+            LocalTextStyle provides Typography.bodyMedium,
+            LocalArchetypeTheme provides archetypeProfile
         ) {
             content()
         }

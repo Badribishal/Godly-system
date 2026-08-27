@@ -61,9 +61,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.engine.SoulExpHistoryEngine
 import com.example.data.local.EvaluationRecordEntity
 import com.example.data.local.EvolutionEventEntity
 import com.example.data.model.SoulIdentity
+import com.example.ui.components.SinVirtueBalanceVisualizer
+import com.example.ui.components.SoulExpTimelineChart
 import com.example.ui.theme.CelestialAmethyst
 import com.example.ui.theme.CelestialAmethystLight
 import com.example.ui.theme.EtherealCyan
@@ -97,8 +100,15 @@ fun HistoryScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: All Chronology, 1: Evolutions Only, 2: Daily Input Logs
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: EXP Dynamics, 1: Chronology, 2: Evolutions, 3: Daily Inputs
     var selectedFilter by remember { mutableStateOf("ALL") } // "ALL", "METAMORPHOSIS", "AWAKENING", "INPUTS"
+
+    // Generate 30-Day Soul EXP Progression Timeline
+    val expTimelineStats = remember(soul, records, events) {
+        if (soul != null) {
+            SoulExpHistoryEngine.generate30DayTimeline(soul, records, events)
+        } else null
+    }
 
     // Merge and sort all entries chronologically (newest first)
     val unifiedChronology = remember(events, records) {
@@ -161,14 +171,6 @@ fun HistoryScreen(
             )
         }
 
-        // Sin & Virtue Balance Chart (Radar / Bar graph visualization)
-        item {
-            com.example.ui.components.SinVirtueBalanceVisualizer(
-                records = records,
-                soul = soul
-            )
-        }
-
         // Tabs Selection
         item {
             TabRow(
@@ -190,9 +192,9 @@ fun HistoryScreen(
                     onClick = { selectedTab = 0 },
                     text = {
                         Text(
-                            text = "CHRONOLOGY (${unifiedChronology.size})",
+                            text = "EXP DYNAMICS (30D)",
                             fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 11.sp
+                            fontSize = 10.5.sp
                         )
                     }
                 )
@@ -201,9 +203,9 @@ fun HistoryScreen(
                     onClick = { selectedTab = 1 },
                     text = {
                         Text(
-                            text = "EVOLUTIONS (${events.size})",
+                            text = "CHRONOLOGY (${unifiedChronology.size})",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 11.sp
+                            fontSize = 10.5.sp
                         )
                     }
                 )
@@ -212,9 +214,20 @@ fun HistoryScreen(
                     onClick = { selectedTab = 2 },
                     text = {
                         Text(
-                            text = "DAILY INPUTS (${records.size})",
+                            text = "EVOLUTIONS (${events.size})",
                             fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 11.sp
+                            fontSize = 10.5.sp
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = {
+                        Text(
+                            text = "INPUTS (${records.size})",
+                            fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 10.5.sp
                         )
                     }
                 )
@@ -224,6 +237,22 @@ fun HistoryScreen(
         // Tab Specific Chronological Content
         when (selectedTab) {
             0 -> {
+                // Recharts Data Visualization: 30-Day Soul Experience Progress
+                if (expTimelineStats != null) {
+                    item {
+                        SoulExpTimelineChart(stats = expTimelineStats)
+                    }
+                }
+
+                // Sin & Virtue Balance Chart (Radar / Bar graph visualization)
+                item {
+                    SinVirtueBalanceVisualizer(
+                        records = records,
+                        soul = soul
+                    )
+                }
+            }
+            1 -> {
                 // Unified Chronological Stream
                 if (unifiedChronology.isEmpty()) {
                     item {
@@ -244,7 +273,7 @@ fun HistoryScreen(
                     }
                 }
             }
-            1 -> {
+            2 -> {
                 // Evolutions Only
                 if (events.isEmpty()) {
                     item {
@@ -258,7 +287,7 @@ fun HistoryScreen(
                     }
                 }
             }
-            2 -> {
+            3 -> {
                 // Daily Input Records Only
                 if (records.isEmpty()) {
                     item {

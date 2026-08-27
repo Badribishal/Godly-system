@@ -38,6 +38,7 @@ import java.util.Locale
 
 enum class ScreenTab {
     MAIN,
+    RECORD,
     SOUL
 }
 
@@ -91,6 +92,18 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
     private val _showWardrobeDialog = MutableStateFlow(false)
     val showWardrobeDialog: StateFlow<Boolean> = _showWardrobeDialog.asStateFlow()
 
+    private val _showArchetypesDialog = MutableStateFlow(false)
+    val showArchetypesDialog: StateFlow<Boolean> = _showArchetypesDialog.asStateFlow()
+
+    private val _selectedQuestForReflection = MutableStateFlow<com.example.data.model.DailyQuest?>(null)
+    val selectedQuestForReflection: StateFlow<com.example.data.model.DailyQuest?> = _selectedQuestForReflection.asStateFlow()
+
+    // Daily Quests State Flow
+    private val _dailyQuestsState = MutableStateFlow(
+        com.example.data.engine.DailyQuestEngine.getDailyQuests(application, SoulIdentity.initial())
+    )
+    val dailyQuestsState: StateFlow<com.example.data.model.DailyQuestState> = _dailyQuestsState.asStateFlow()
+
     private val _showRecordDialog = MutableStateFlow(false)
     val showRecordDialog: StateFlow<Boolean> = _showRecordDialog.asStateFlow()
 
@@ -100,6 +113,12 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
     private val _showAwakeningModal = MutableStateFlow(false)
     val showAwakeningModal: StateFlow<Boolean> = _showAwakeningModal.asStateFlow()
 
+    private val _levelUpOutcome = MutableStateFlow<com.example.data.engine.LevelUpOutcome?>(null)
+    val levelUpOutcome: StateFlow<com.example.data.engine.LevelUpOutcome?> = _levelUpOutcome.asStateFlow()
+
+    private val _showLevelUpModal = MutableStateFlow(false)
+    val showLevelUpModal: StateFlow<Boolean> = _showLevelUpModal.asStateFlow()
+
     // Theme & Minimal Palette State
     private val _themeMode = MutableStateFlow(
         AppThemeMode.valueOf(prefs.getString("theme_mode", AppThemeMode.DARK.name) ?: AppThemeMode.DARK.name)
@@ -108,9 +127,9 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _rarePalette = MutableStateFlow(
         try {
-            RarePalette.valueOf(prefs.getString("rare_palette", RarePalette.CELESTIAL_TWILIGHT.name) ?: RarePalette.CELESTIAL_TWILIGHT.name)
+            RarePalette.valueOf(prefs.getString("rare_palette", RarePalette.ARCHETYPE_RESONANCE.name) ?: RarePalette.ARCHETYPE_RESONANCE.name)
         } catch (e: Exception) {
-            RarePalette.CELESTIAL_TWILIGHT
+            RarePalette.ARCHETYPE_RESONANCE
         }
     )
     val rarePalette: StateFlow<RarePalette> = _rarePalette.asStateFlow()
@@ -251,6 +270,88 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeWardrobe() {
         _showWardrobeDialog.value = false
+    }
+
+    fun openArchetypesDialog() {
+        _showArchetypesDialog.value = true
+    }
+
+    fun closeArchetypesDialog() {
+        _showArchetypesDialog.value = false
+    }
+
+    fun openQuestReflection(quest: com.example.data.model.DailyQuest) {
+        _selectedQuestForReflection.value = quest
+    }
+
+    fun dismissQuestReflection() {
+        _selectedQuestForReflection.value = null
+    }
+
+    fun refreshDailyQuests() {
+        val soul = soulProfile.value
+        _dailyQuestsState.value = com.example.data.engine.DailyQuestEngine.getDailyQuests(getApplication(), soul)
+    }
+
+    fun completeDailyQuest(questId: String, reflection: String) {
+        val soul = soulProfile.value
+        val (newState, completedQuest) = com.example.data.engine.DailyQuestEngine.completeQuest(
+            getApplication(),
+            questId,
+            reflection,
+            soul
+        )
+        _dailyQuestsState.value = newState
+        _selectedQuestForReflection.value = null
+
+        if (completedQuest != null) {
+            viewModelScope.launch {
+                repository.addSoulShards(completedQuest.shardsReward)
+                val outcome = repository.addSoulExp(completedQuest.expReward)
+                _systemToast.value = "Quest Complete: ${completedQuest.title} (+${completedQuest.expReward} EXP, +${completedQuest.shardsReward} 💎)"
+                if (outcome != null) {
+                    _levelUpOutcome.value = outcome
+                    _showLevelUpModal.value = true
+                }
+                refreshAchievements()
+            }
+        }
+    }
+
+    fun claimDailyQuestsBonus() {
+        val soul = soulProfile.value
+        val currentState = _dailyQuestsState.value
+        if (currentState.isAllCompleted && !currentState.allCompletedBonusClaimed) {
+            val updatedState = com.example.data.engine.DailyQuestEngine.claimAllCompletedBonus(getApplication(), soul)
+            _dailyQuestsState.value = updatedState
+
+            viewModelScope.launch {
+                repository.addSoulShards(currentState.bonusShardsReward)
+                val outcome = repository.addSoulExp(currentState.bonusExpReward)
+                _systemToast.value = "Ascension Daily Cache Claimed! (+${currentState.bonusExpReward} EXP & +${currentState.bonusShardsReward} 💎)"
+                if (outcome != null) {
+                    _levelUpOutcome.value = outcome
+                    _showLevelUpModal.value = true
+                }
+                refreshAchievements()
+            }
+        }
+    }
+
+    fun dismissLevelUpModal() {
+        _showLevelUpModal.value = false
+        _levelUpOutcome.value = null
+    }
+
+    fun attuneArchetype(archetypeId: String) {
+        viewModelScope.launch {
+            val success = repository.attuneArchetype(archetypeId)
+            if (success) {
+                val def = com.example.data.model.AdvancedArchetypesCatalog.getArchetypeById(archetypeId)
+                _systemToast.value = "✦ Attuned Archetype: ${def.name} [${def.titlePrefix}]!"
+                refreshAchievements()
+            }
+        }
     }
 
     fun openRecordDialog() {
@@ -394,6 +495,7 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val reward = state.todayRewardShards
         val newTotal = state.totalClaimedCount + 1
+        val expReward = 45 + (state.streakDay * 10)
 
         prefs.edit()
             .putString("last_daily_login_date", todayStr)
@@ -408,16 +510,39 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             repository.addSoulShards(reward)
-            _systemToast.value = "Daily Resonance Claimed: +$reward Soul Shards (Day ${state.streakDay}/7)!"
+            val outcome = repository.addSoulExp(expReward)
+            _systemToast.value = "Daily Resonance Claimed: +$reward Shards & +$expReward Soul EXP (Day ${state.streakDay}/7)!"
+            if (outcome != null) {
+                _levelUpOutcome.value = outcome
+                _showLevelUpModal.value = true
+            }
             refreshAchievements()
         }
     }
 
     fun claimAchievementReward(achievementId: String) {
         viewModelScope.launch {
-            val rewarded = repository.claimAchievement(achievementId)
+            val (rewarded, outcome) = repository.claimAchievement(achievementId)
             if (rewarded > 0) {
-                _systemToast.value = "Claimed +$rewarded Soul Shards!"
+                _systemToast.value = "Claimed +$rewarded Soul Shards & +35 Soul EXP!"
+                if (outcome != null) {
+                    _levelUpOutcome.value = outcome
+                    _showLevelUpModal.value = true
+                }
+                refreshAchievements()
+            }
+        }
+    }
+
+    fun claimAllAchievementsReward() {
+        viewModelScope.launch {
+            val (totalRewarded, outcome) = repository.claimAllAchievements()
+            if (totalRewarded > 0) {
+                _systemToast.value = "Harvested All Milestones: +$totalRewarded Soul Shards! 💎"
+                if (outcome != null) {
+                    _levelUpOutcome.value = outcome
+                    _showLevelUpModal.value = true
+                }
                 refreshAchievements()
             }
         }
@@ -461,7 +586,12 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             repository.addSoulShards(25)
-            _systemToast.value = "Calibrated with ${state.name} (${state.resonanceAffinity}): +25 💎 Shards & Resonance Tuned!"
+            val outcome = repository.addSoulExp(50)
+            _systemToast.value = "Calibrated with ${state.name} (${state.resonanceAffinity}): +25 Shards & +50 Soul EXP!"
+            if (outcome != null) {
+                _levelUpOutcome.value = outcome
+                _showLevelUpModal.value = true
+            }
             refreshAchievements()
         }
     }

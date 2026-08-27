@@ -68,10 +68,43 @@ class ExampleRobolectricTest {
   @Test
   fun `test achievement catalog definitions exist`() {
     val definitions = com.example.data.model.AchievementCatalog.DEFINITIONS
-    assertTrue(definitions.size >= 8)
+    assertTrue(definitions.size >= 1000)
     val firstRecord = definitions.find { it.id == "first_record" }
     assertNotNull(firstRecord)
     assertEquals(30, firstRecord?.rewardShards)
+  }
+
+  @Test
+  fun `test soul progression engine level and tier calculations`() {
+    val initialSoul = SoulIdentity.initial()
+    assertEquals(1, initialSoul.soulLevel)
+    assertEquals(0, initialSoul.soulExp)
+
+    // Apply 500 EXP
+    val (triplet, outcome) = com.example.data.engine.SoulProgressionEngine.applyExpGain(
+      currentLevel = initialSoul.soulLevel,
+      currentExp = initialSoul.soulExp,
+      totalExp = initialSoul.totalSoulExp,
+      gainedExp = 500,
+      alreadyUnlockedArchetypeIds = initialSoul.unlockedArchetypeIds.toSet()
+    )
+
+    val (newLevel, newExp, newTotalExp) = triplet
+    assertTrue(newLevel > 1)
+    assertEquals(500, newTotalExp)
+    assertNotNull(outcome)
+    assertTrue(outcome!!.levelsGained > 0)
+    assertTrue(outcome.newlyUnlockedArchetypes.isNotEmpty())
+  }
+
+  @Test
+  fun `test advanced archetype catalog retrieval and tier mapping`() {
+    val starter = com.example.data.model.AdvancedArchetypesCatalog.getArchetypeById("arch_seeker")
+    assertEquals("The Awakening Vessel", starter.name)
+    assertEquals(1, starter.requiredLevel)
+
+    val allArchetypes = com.example.data.model.AdvancedArchetypesCatalog.ALL_ARCHETYPES
+    assertTrue(allArchetypes.size >= 20)
   }
 
   @Test

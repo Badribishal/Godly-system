@@ -6,6 +6,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -273,8 +274,10 @@ fun SettingsDialog(
                         }
                     }
 
-                    // SECTION 2: MINIMAL PALETTE THEMES (INCL. 2 BRIGHTER THEMES)
+                    // SECTION 2: DYNAMIC ARCHETYPE THEME & PALETTES
                     item {
+                        val activeArchetypeTheme = com.example.ui.theme.LocalArchetypeTheme.current
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -287,17 +290,82 @@ fun SettingsDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "COLOR PALETTES",
+                                        text = "DYNAMIC THEMES & PALETTES",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
                                         letterSpacing = 1.sp
                                     )
                                     Text(
-                                        text = "${RarePalette.values().size} Minimal Themes",
+                                        text = "${RarePalette.values().size} Themes",
                                         fontSize = 10.sp,
                                         color = TextMuted
                                     )
+                                }
+
+                                // Active Dynamic Archetype Resonance Status Banner
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (currentPalette == RarePalette.ARCHETYPE_RESONANCE) activeArchetypeTheme.primary.copy(alpha = 0.5f)
+                                        else SurfaceCardBorder
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(text = activeArchetypeTheme.family.rune, fontSize = 14.sp)
+                                                Text(
+                                                    text = "ATTUNED: ${activeArchetypeTheme.name.uppercase()}",
+                                                    fontSize = 10.5.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = activeArchetypeTheme.primary
+                                                )
+                                            }
+                                            Surface(
+                                                color = if (activeArchetypeTheme.isWarm) Color(0xFFF97316).copy(alpha = 0.18f)
+                                                else if (activeArchetypeTheme.isCoolEthereal) Color(0xFF8B5CF6).copy(alpha = 0.18f)
+                                                else Color(0xFF10B981).copy(alpha = 0.18f),
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = if (activeArchetypeTheme.isWarm) "WARM FLAME"
+                                                    else if (activeArchetypeTheme.isCoolEthereal) "COOL ETHEREAL"
+                                                    else "PRIMORDIAL",
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (activeArchetypeTheme.isWarm) Color(0xFFFDBA74)
+                                                    else if (activeArchetypeTheme.isCoolEthereal) Color(0xFFC4B5FD)
+                                                    else Color(0xFF6EE7B7),
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
+                                        Text(
+                                            text = "Class: ${activeArchetypeTheme.characterClass} • Element: ${activeArchetypeTheme.element}",
+                                            fontSize = 10.5.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                            text = "« ${activeArchetypeTheme.flavorDescription} »",
+                                            fontSize = 9.5.sp,
+                                            color = TextMuted,
+                                            fontFamily = FontFamily.Serif
+                                        )
+                                    }
                                 }
 
                                 // Minimal Theme Cards Grid
@@ -310,6 +378,13 @@ fun SettingsDialog(
                                     RarePalette.values().forEach { palette ->
                                         val isSelected = currentPalette == palette
                                         val isBright = palette == RarePalette.RADIANT_SOLAR || palette == RarePalette.PRISMATIC_OPAL
+                                        val isDynamic = palette == RarePalette.ARCHETYPE_RESONANCE
+
+                                        val (primaryColor, secondaryColor, _) = if (isDynamic) {
+                                            Triple(activeArchetypeTheme.primary, activeArchetypeTheme.secondary, activeArchetypeTheme.tertiary)
+                                        } else {
+                                            Triple(palette.primaryColor, palette.secondaryColor, palette.accentColor)
+                                        }
 
                                         Surface(
                                             modifier = Modifier
@@ -317,7 +392,7 @@ fun SettingsDialog(
                                                 .clip(RoundedCornerShape(12.dp))
                                                 .border(
                                                     width = if (isSelected) 1.8.dp else 0.8.dp,
-                                                    color = if (isSelected) palette.primaryColor else SurfaceCardBorder,
+                                                    color = if (isSelected) primaryColor else SurfaceCardBorder,
                                                     shape = RoundedCornerShape(12.dp)
                                                 )
                                                 .clickable { onSetPalette(palette) },
@@ -328,7 +403,7 @@ fun SettingsDialog(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                // Minimalist Dual-Dot Color Indicator
+                                                // Dual-Dot Color Indicator
                                                 Row(
                                                     horizontalArrangement = Arrangement.spacedBy((-4).dp),
                                                     verticalAlignment = Alignment.CenterVertically
@@ -337,27 +412,34 @@ fun SettingsDialog(
                                                         modifier = Modifier
                                                             .size(14.dp)
                                                             .clip(CircleShape)
-                                                            .background(palette.primaryColor)
+                                                            .background(primaryColor)
                                                             .border(1.dp, Color.Black.copy(alpha = 0.2f), CircleShape)
                                                     )
                                                     Box(
                                                         modifier = Modifier
                                                             .size(14.dp)
                                                             .clip(CircleShape)
-                                                            .background(palette.secondaryColor)
+                                                            .background(secondaryColor)
                                                             .border(1.dp, Color.Black.copy(alpha = 0.2f), CircleShape)
                                                     )
                                                 }
 
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = palette.title.substringBefore(" "),
+                                                        text = if (isDynamic) "Dynamic Archetype" else palette.title.substringBefore(" "),
                                                         fontSize = 11.sp,
                                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                         color = MaterialTheme.colorScheme.onSurface,
                                                         maxLines = 1
                                                     )
-                                                    if (isBright) {
+                                                    if (isDynamic) {
+                                                        Text(
+                                                            text = "✦ Auto-Adaptive",
+                                                            fontSize = 8.5.sp,
+                                                            color = primaryColor,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    } else if (isBright) {
                                                         Text(
                                                             text = "☀ Bright",
                                                             fontSize = 9.sp,
@@ -371,7 +453,7 @@ fun SettingsDialog(
                                                     Icon(
                                                         imageVector = Icons.Default.Check,
                                                         contentDescription = "Selected",
-                                                        tint = palette.primaryColor,
+                                                        tint = primaryColor,
                                                         modifier = Modifier.size(14.dp)
                                                     )
                                                 }

@@ -1,11 +1,15 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -16,15 +20,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,9 +41,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,14 +79,46 @@ fun AchievementsDialog(
     dailyLoginState: DailyLoginRewardState = DailyLoginRewardState(),
     onClaimDailyLogin: () -> Unit = {},
     onClaimReward: (String) -> Unit,
+    onClaimAllRewards: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    val unlockedCount = achievements.count { it.isUnlocked }
-    val sortedAchievements = achievements.sortedWith(
-        compareByDescending<Achievement> { it.isUnlocked && !it.isClaimed }
-            .thenByDescending { it.isUnlocked }
-            .thenByDescending { it.currentProgress.toFloat() / it.targetProgress }
-    )
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategoryTab by remember { mutableStateOf("ALL") }
+
+    val unlockedCount = remember(achievements) { achievements.count { it.isUnlocked } }
+    val unclaimedUnlockedCount = remember(achievements) { achievements.count { it.isUnlocked && !it.isClaimed } }
+    val totalClaimableShards = remember(achievements) { achievements.filter { it.isUnlocked && !it.isClaimed }.sumOf { it.rewardShards } }
+
+    val categories = remember(achievements) {
+        listOf("ALL", "CLAIMABLE", "VIRTUOUS", "SHADOWS", "INSCRIPTIONS", "ASCENSION", "WEALTH & COSMETICS")
+    }
+
+    val filteredAchievements = remember(achievements, selectedCategoryTab, searchQuery) {
+        achievements.filter { item ->
+            val matchesCategory = when (selectedCategoryTab) {
+                "ALL" -> true
+                "CLAIMABLE" -> item.isUnlocked && !item.isClaimed
+                "VIRTUOUS" -> item.category.contains("Virtue", ignoreCase = true)
+                "SHADOWS" -> item.category.contains("Shadow", ignoreCase = true)
+                "INSCRIPTIONS" -> item.category.contains("Inscript", ignoreCase = true) || item.category.contains("Dedication", ignoreCase = true)
+                "ASCENSION" -> item.category.contains("Ascension", ignoreCase = true) || item.category.contains("Resonance", ignoreCase = true) || item.category.contains("Evolution", ignoreCase = true)
+                "WEALTH & COSMETICS" -> item.category.contains("Wealth", ignoreCase = true) || item.category.contains("Cosmetic", ignoreCase = true)
+                else -> true
+            }
+
+            val matchesSearch = if (searchQuery.isBlank()) true else {
+                item.title.contains(searchQuery, ignoreCase = true) ||
+                item.description.contains(searchQuery, ignoreCase = true) ||
+                item.category.contains(searchQuery, ignoreCase = true)
+            }
+
+            matchesCategory && matchesSearch
+        }.sortedWith(
+            compareByDescending<Achievement> { it.isUnlocked && !it.isClaimed }
+                .thenByDescending { it.isUnlocked }
+                .thenByDescending { it.currentProgress.toFloat() / it.targetProgress.coerceAtLeast(1) }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -81,8 +126,8 @@ fun AchievementsDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.92f)
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.94f)
                 .clip(RoundedCornerShape(24.dp))
                 .border(1.5.dp, SurfaceCardBorder, RoundedCornerShape(24.dp))
                 .testTag("achievements_dialog"),
@@ -91,7 +136,8 @@ fun AchievementsDialog(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(18.dp)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header
                 Row(
@@ -105,7 +151,7 @@ fun AchievementsDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(38.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(RadiantGold.copy(alpha = 0.2f))
                                 .border(1.2.dp, RadiantGold.copy(alpha = 0.6f), CircleShape),
@@ -115,23 +161,23 @@ fun AchievementsDialog(
                                 imageVector = Icons.Default.EmojiEvents,
                                 contentDescription = "Achievements",
                                 tint = RadiantGoldBright,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         Column {
                             Text(
-                                text = "SOUL ACHIEVEMENTS",
+                                text = "SOUL ACHIEVEMENTS (1000+)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = RadiantGoldBright,
                                 fontFamily = FontFamily.Serif,
                                 letterSpacing = 1.sp
                             )
                             Text(
                                 text = "$unlockedCount of ${achievements.size} Milestones Conquered",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted,
-                                fontSize = 11.sp
+                                color = CelestialAmethystLight,
+                                fontSize = 11.5.sp
                             )
                         }
                     }
@@ -148,33 +194,24 @@ fun AchievementsDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Summary Stats Bar
+                // Summary Stats & Global Claim All Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .border(0.8.dp, SurfaceCardBorder, RoundedCornerShape(14.dp))
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(text = "Current Soul Shards:", fontSize = 11.sp, color = TextMuted)
+                        Text(text = "Vault:", fontSize = 11.sp, color = TextMuted)
                         Text(text = "💎 $soulShards", fontSize = 13.sp, color = EtherealCyan, fontWeight = FontWeight.Bold)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(CelestialAmethyst.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
+                        Text(text = "•", fontSize = 11.sp, color = TextMuted)
                         Text(
                             text = "${(unlockedCount.toFloat() / achievements.size.coerceAtLeast(1) * 100).toInt()}% Done",
                             fontSize = 11.sp,
@@ -182,156 +219,284 @@ fun AchievementsDialog(
                             color = CelestialAmethystLight
                         )
                     }
+
+                    if (unclaimedUnlockedCount > 0) {
+                        Button(
+                            onClick = onClaimAllRewards,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = RadiantGoldBright,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("claim_all_achievements_button")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = "Claim All",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = "Harvest All ($unclaimedUnlockedCount) +$totalClaimableShards 💎",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // Filter & Search Controls
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("achievement_search_input"),
+                    placeholder = {
+                        Text(
+                            text = "Search 1,000+ milestones (e.g. Humility, Wrath, Shards...)",
+                            fontSize = 11.5.sp,
+                            color = TextMuted
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = TextMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear search",
+                                    tint = TextMuted,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = RadiantGold,
+                        unfocusedBorderColor = SurfaceCardBorder,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
 
-                // Achievements List & Daily Login Harvest
+                // Category Chips
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(categories) { cat ->
+                        val isSelected = selectedCategoryTab == cat
+                        val count = when (cat) {
+                            "ALL" -> achievements.size
+                            "CLAIMABLE" -> unclaimedUnlockedCount
+                            "VIRTUOUS" -> achievements.count { it.category.contains("Virtue", ignoreCase = true) }
+                            "SHADOWS" -> achievements.count { it.category.contains("Shadow", ignoreCase = true) }
+                            "INSCRIPTIONS" -> achievements.count { it.category.contains("Inscript", ignoreCase = true) || it.category.contains("Dedication", ignoreCase = true) }
+                            "ASCENSION" -> achievements.count { it.category.contains("Ascension", ignoreCase = true) || it.category.contains("Resonance", ignoreCase = true) || it.category.contains("Evolution", ignoreCase = true) }
+                            "WEALTH & COSMETICS" -> achievements.count { it.category.contains("Wealth", ignoreCase = true) || it.category.contains("Cosmetic", ignoreCase = true) }
+                            else -> 0
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(
+                                    if (isSelected) RadiantGold.copy(alpha = 0.22f)
+                                    else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    width = if (isSelected) 1.2.dp else 0.6.dp,
+                                    color = if (isSelected) RadiantGoldBright else SurfaceCardBorder,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .clickable { selectedCategoryTab = cat }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = cat,
+                                    fontSize = 10.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) RadiantGoldBright else TextMuted
+                                )
+                                Text(
+                                    text = "($count)",
+                                    fontSize = 9.sp,
+                                    color = if (isSelected) Color.White else TextMuted
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Achievements List & Daily Harvest
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // INTEGRATED DAILY LOGIN REWARD (Inside Achievement Section)
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .border(
-                                    1.2.dp,
-                                    if (!dailyLoginState.isClaimedToday) RadiantGold.copy(alpha = 0.6f) else SurfaceCardBorder,
-                                    RoundedCornerShape(16.dp)
+                    // INTEGRATED DAILY LOGIN REWARD
+                    if (selectedCategoryTab == "ALL" || selectedCategoryTab == "CLAIMABLE") {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(
+                                        1.2.dp,
+                                        if (!dailyLoginState.isClaimedToday) RadiantGold.copy(alpha = 0.6f) else SurfaceCardBorder,
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                    .testTag("daily_login_harvest_card"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
-                                .testTag("daily_login_harvest_card"),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.WbSunny,
-                                            contentDescription = "Solar Login",
-                                            tint = RadiantGoldBright,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Text(
-                                            text = "DAILY SOLAR RESONANCE",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = RadiantGoldBright,
-                                            letterSpacing = 1.sp
-                                        )
-                                    }
-                                    Text(
-                                        text = if (dailyLoginState.isClaimedToday) "Claimed Today ✨" else "Ready to Harvest",
-                                        fontSize = 10.sp,
-                                        color = if (dailyLoginState.isClaimedToday) CelestialAmethystLight else EtherealCyan,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-
-                                // 7-Day Track Pills
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    dailyLoginState.rewardsList.forEachIndexed { index, reward ->
-                                        val dayNum = index + 1
-                                        val isPastClaimed = (dayNum < dailyLoginState.streakDay) || (dayNum == dailyLoginState.streakDay && dailyLoginState.isClaimedToday)
-                                        val isCurrent = dayNum == dailyLoginState.streakDay && !dailyLoginState.isClaimedToday
-
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                                            modifier = Modifier.weight(1f)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(34.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(
-                                                        when {
-                                                            isCurrent -> RadiantGold.copy(alpha = 0.25f)
-                                                            isPastClaimed -> CelestialAmethyst.copy(alpha = 0.2f)
-                                                            else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                                                        }
-                                                    )
-                                                    .border(
-                                                        width = if (isCurrent) 1.5.dp else 0.8.dp,
-                                                        color = when {
-                                                            isCurrent -> RadiantGoldBright
-                                                            isPastClaimed -> CelestialAmethyst
-                                                            else -> SurfaceCardBorder
-                                                        },
-                                                        shape = RoundedCornerShape(8.dp)
-                                                    ),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                if (isPastClaimed) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Check,
-                                                        contentDescription = "Claimed",
-                                                        tint = RadiantGoldBright,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        text = "+$reward",
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = if (isCurrent) RadiantGoldBright else TextMuted
-                                                    )
-                                                }
-                                            }
+                                            Icon(
+                                                imageVector = Icons.Default.WbSunny,
+                                                contentDescription = "Solar Login",
+                                                tint = RadiantGoldBright,
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                             Text(
-                                                text = "D$dayNum",
-                                                fontSize = 9.sp,
-                                                color = if (isCurrent) RadiantGoldBright else TextMuted,
-                                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                                text = "DAILY SOLAR RESONANCE",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = RadiantGoldBright,
+                                                letterSpacing = 1.sp
                                             )
                                         }
-                                    }
-                                }
-
-                                // Claim Button
-                                Button(
-                                    onClick = onClaimDailyLogin,
-                                    enabled = !dailyLoginState.isClaimedToday,
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = RadiantGoldBright,
-                                        contentColor = Color.Black,
-                                        disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                                        disabledContentColor = TextMuted
-                                    ),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .testTag("claim_daily_resonance_button")
-                                ) {
-                                    if (!dailyLoginState.isClaimedToday) {
                                         Text(
-                                            text = "Claim Day ${dailyLoginState.streakDay} Resonance (+${dailyLoginState.todayRewardShards} 💎)",
-                                            fontSize = 12.sp,
+                                            text = if (dailyLoginState.isClaimedToday) "Claimed Today ✨" else "Ready to Harvest",
+                                            fontSize = 10.sp,
+                                            color = if (dailyLoginState.isClaimedToday) CelestialAmethystLight else EtherealCyan,
                                             fontWeight = FontWeight.Bold
                                         )
-                                    } else {
-                                        Text(
-                                            text = "✓ Day ${dailyLoginState.streakDay} Claimed (Next in 24h)",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Normal
-                                        )
+                                    }
+
+                                    // 7-Day Track Pills
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        dailyLoginState.rewardsList.forEachIndexed { index, reward ->
+                                            val dayNum = index + 1
+                                            val isPastClaimed = (dayNum < dailyLoginState.streakDay) || (dayNum == dailyLoginState.streakDay && dailyLoginState.isClaimedToday)
+                                            val isCurrent = dayNum == dailyLoginState.streakDay && !dailyLoginState.isClaimedToday
+
+                                            Column(
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(34.dp)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .background(
+                                                            when {
+                                                                isCurrent -> RadiantGold.copy(alpha = 0.25f)
+                                                                isPastClaimed -> CelestialAmethyst.copy(alpha = 0.2f)
+                                                                else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                                            }
+                                                        )
+                                                        .border(
+                                                            width = if (isCurrent) 1.5.dp else 0.8.dp,
+                                                            color = when {
+                                                                isCurrent -> RadiantGoldBright
+                                                                isPastClaimed -> CelestialAmethyst
+                                                                else -> SurfaceCardBorder
+                                                            },
+                                                            shape = RoundedCornerShape(8.dp)
+                                                        ),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    if (isPastClaimed) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Check,
+                                                            contentDescription = "Claimed",
+                                                            tint = RadiantGoldBright,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            text = "+$reward",
+                                                            fontSize = 9.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = if (isCurrent) RadiantGoldBright else TextMuted
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = "D$dayNum",
+                                                    fontSize = 9.sp,
+                                                    color = if (isCurrent) RadiantGoldBright else TextMuted,
+                                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    // Claim Button
+                                    Button(
+                                        onClick = onClaimDailyLogin,
+                                        enabled = !dailyLoginState.isClaimedToday,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = RadiantGoldBright,
+                                            contentColor = Color.Black,
+                                            disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                            disabledContentColor = TextMuted
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("claim_daily_resonance_button")
+                                    ) {
+                                        if (!dailyLoginState.isClaimedToday) {
+                                            Text(
+                                                text = "Claim Day ${dailyLoginState.streakDay} Resonance (+${dailyLoginState.todayRewardShards} 💎)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "✓ Day ${dailyLoginState.streakDay} Claimed (Next in 24h)",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Normal
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -348,22 +513,23 @@ fun AchievementsDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "MILESTONES & TRIALS",
+                                text = "SHOWING ${filteredAchievements.size} MILESTONES",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "Tap Claim on conquered milestones",
+                                text = if (unclaimedUnlockedCount > 0) "$unclaimedUnlockedCount ready to harvest!" else "Progress updates automatically",
                                 fontSize = 10.sp,
-                                color = TextMuted
+                                color = if (unclaimedUnlockedCount > 0) RadiantGoldBright else TextMuted,
+                                fontWeight = if (unclaimedUnlockedCount > 0) FontWeight.Bold else FontWeight.Normal
                             )
                         }
                     }
 
                     // ACHIEVEMENT ITEMS
-                    items(sortedAchievements, key = { it.id }) { item ->
+                    items(filteredAchievements, key = { it.id }) { item ->
                         AchievementCard(
                             achievement = item,
                             onClaim = { onClaimReward(item.id) }
@@ -428,7 +594,7 @@ fun AchievementCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = achievement.icon, fontSize = 20.sp)
+                Text(text = achievement.icon, fontSize = 18.sp)
             }
 
             // Info
@@ -522,7 +688,7 @@ fun AchievementCard(
                             contentColor = Color.Black
                         ),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier.testTag("claim_btn_${achievement.id}")
                     ) {
                         Text(

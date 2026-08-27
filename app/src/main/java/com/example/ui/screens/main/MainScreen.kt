@@ -33,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,18 +45,22 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.engine.SoulExpHistoryEngine
 import com.example.data.engine.SoulResonanceData
 import com.example.data.local.DailyTrialEntity
 import com.example.data.local.EvaluationRecordEntity
 import com.example.data.local.EvolutionEventEntity
+import com.example.data.model.DailyQuest
+import com.example.data.model.DailyQuestState
 import com.example.data.model.SoulIdentity
 import com.example.ui.components.AstralEmotionalState
 import com.example.ui.components.DailyEmotionalCheckInCard
-import com.example.ui.components.GodlyPoeticFeedbackCard
+import com.example.ui.components.DailyQuestsCard
 import com.example.ui.components.IdentityHeader
 import com.example.ui.components.OracleMessageCard
 import com.example.ui.components.SanctuaryLibraryCard
 import com.example.ui.components.SinVirtueBalanceVisualizer
+import com.example.ui.components.SoulExpTimelineChart
 import com.example.ui.theme.CelestialAmethyst
 import com.example.ui.theme.CelestialAmethystLight
 import com.example.ui.theme.EtherealCyan
@@ -74,6 +79,9 @@ fun MainScreen(
     records: List<EvaluationRecordEntity> = emptyList(),
     events: List<EvolutionEventEntity> = emptyList(),
     resonance: SoulResonanceData? = null,
+    questState: DailyQuestState? = null,
+    onQuestClick: (DailyQuest) -> Unit = {},
+    onClaimQuestBonus: () -> Unit = {},
     checkedInEmotion: String? = null,
     isCheckedInToday: Boolean = false,
     onDailyCheckIn: (AstralEmotionalState) -> Unit = {},
@@ -85,8 +93,13 @@ fun MainScreen(
     onOpenSettings: () -> Unit = {},
     onOpenAchievements: () -> Unit = {},
     onOpenWardrobe: () -> Unit = {},
+    onOpenArchetypes: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val expTimelineStats = remember(soul, records, events) {
+        SoulExpHistoryEngine.generate30DayTimeline(soul, records, events)
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -233,7 +246,8 @@ fun MainScreen(
         item {
             IdentityHeader(
                 soul = soul,
-                resonance = resonance
+                resonance = resonance,
+                onOpenArchetypes = onOpenArchetypes
             )
         }
 
@@ -325,6 +339,17 @@ fun MainScreen(
             )
         }
 
+        // Daily Soul Quests Card (Reflective tasks to earn Soul Experience)
+        if (questState != null) {
+            item {
+                DailyQuestsCard(
+                    questState = questState,
+                    onQuestClick = onQuestClick,
+                    onClaimBonus = onClaimQuestBonus
+                )
+            }
+        }
+
         // 3rd Card: Daily Emotional Check-In Sequence
         item {
             DailyEmotionalCheckInCard(
@@ -342,13 +367,6 @@ fun MainScreen(
             )
         }
 
-        // Automated Godly Identity Poetic Feedback (Dynamic Reflection of Current Virtue/Sin Matrix)
-        item {
-            GodlyPoeticFeedbackCard(
-                soul = soul
-            )
-        }
-
         // 5th Card: Sin vs Virtue Balance Visualizer (Radar Chart & Bar Graph toggle)
         item {
             SinVirtueBalanceVisualizer(
@@ -357,7 +375,12 @@ fun MainScreen(
             )
         }
 
-        // 6th Card: System Omen / Mysterious Message Ticker
+        // 6th Card: 30-Day Soul Experience Progress Timeline Data Visualization (Recharts-inspired dynamic curve)
+        item {
+            SoulExpTimelineChart(stats = expTimelineStats)
+        }
+
+        // 7th Card: System Omen / Mysterious Message Ticker
         item {
             Box(
                 modifier = Modifier

@@ -21,6 +21,16 @@ enum class RarePalette(
     val darkBackground: Color,
     val lightBackground: Color
 ) {
+    ARCHETYPE_RESONANCE(
+        id = "archetype_resonance",
+        title = "Archetype Resonance ✦",
+        description = "Dynamic aura synchronized directly to your attuned Soul Archetype, Class & Elemental Nature.",
+        primaryColor = Color(0xFFF59E0B),
+        secondaryColor = Color(0xFF8B5CF6),
+        accentColor = Color(0xFF06B6D4),
+        darkBackground = Color(0xFF000000),
+        lightBackground = Color(0xFFFAF7FF)
+    ),
     CELESTIAL_TWILIGHT(
         id = "celestial_twilight",
         title = "Celestial Twilight",
@@ -124,7 +134,16 @@ enum class RarePalette(
 }
 
 object DynamicThemeBuilder {
-    fun buildColorScheme(palette: RarePalette, isDark: Boolean): ColorScheme {
+    fun buildColorScheme(
+        palette: RarePalette,
+        isDark: Boolean,
+        soul: com.example.data.model.SoulIdentity? = null
+    ): ColorScheme {
+        if (palette == RarePalette.ARCHETYPE_RESONANCE) {
+            val archetypeProfile = ArchetypeThemeEngine.getThemeForSoul(soul)
+            return if (isDark) archetypeProfile.toDarkColorScheme() else archetypeProfile.toLightColorScheme()
+        }
+
         return if (isDark) {
             darkColorScheme(
                 primary = palette.primaryColor,
@@ -187,6 +206,22 @@ object DynamicThemeBuilder {
                 error = Color(0xFFDC2626),
                 onError = Color.White
             )
+        }
+    }
+
+    /**
+     * Resolves the visual preview colors (Primary, Secondary, Accent) for a given palette,
+     * taking into account the active soul archetype when ARCHETYPE_RESONANCE is selected.
+     */
+    fun getEffectiveColors(
+        palette: RarePalette,
+        soul: com.example.data.model.SoulIdentity? = null
+    ): Triple<Color, Color, Color> {
+        return if (palette == RarePalette.ARCHETYPE_RESONANCE) {
+            val profile = ArchetypeThemeEngine.getThemeForSoul(soul)
+            Triple(profile.primary, profile.secondary, profile.tertiary)
+        } else {
+            Triple(palette.primaryColor, palette.secondaryColor, palette.accentColor)
         }
     }
 }

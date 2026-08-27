@@ -22,6 +22,11 @@ data class EvolutionState(
     val resonanceFrequency: String = "432 Hz • Astral Harmonics",
     val evolutionHistoryCount: Int = 0,
     val soulShards: Int = 100,
+    val soulLevel: Int = 1,
+    val soulExp: Int = 0,
+    val totalSoulExp: Int = 0,
+    val attunedArchetypeId: String = "arch_seeker",
+    val unlockedArchetypeIds: Set<String> = setOf("arch_seeker"),
     val equippedEffectId: String = "effect_default",
     val unlockedEffectIds: Set<String> = setOf("effect_default"),
     val claimedAchievementIds: Set<String> = emptySet()
@@ -50,6 +55,11 @@ data class EvolutionState(
                 weaknesses = listOf("Uncalibrated Forces", "Vulnerable to Cognitive Dissonance"),
                 systemMessage = "The System has initiated observation. Your choices will shape the vessel.",
                 soulShards = 100,
+                soulLevel = 1,
+                soulExp = 0,
+                totalSoulExp = 0,
+                attunedArchetypeId = "arch_seeker",
+                unlockedArchetypeIds = setOf("arch_seeker"),
                 equippedEffectId = "effect_default",
                 unlockedEffectIds = setOf("effect_default"),
                 claimedAchievementIds = emptySet()

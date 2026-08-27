@@ -150,9 +150,27 @@ class SoulRepository(private val soulDao: SoulDao) {
             recordCount = count + 1
         )
 
-        // Award 15 Soul Shards for consistent daily recording
+        // Calculate Soul EXP earned: base 85 + depth bonus up to 65
+        val depthBonus = kotlin.math.min(65, (input.situation.length + input.reflection.length) / 4)
+        val earnedExp = 85 + depthBonus
+
+        val (progressionTriple, levelOutcome) = com.example.data.engine.SoulProgressionEngine.applyExpGain(
+            currentLevel = updatedIdentityTemp.soulLevel,
+            currentExp = updatedIdentityTemp.soulExp,
+            totalExp = updatedIdentityTemp.totalSoulExp,
+            gainedExp = earnedExp,
+            alreadyUnlockedArchetypeIds = updatedIdentityTemp.unlockedArchetypeIds
+        )
+        val (newLevel, newExp, newTotalExp) = progressionTriple
+        val newlyUnlockedIds = levelOutcome?.newlyUnlockedArchetypes?.map { it.id }?.toSet() ?: emptySet()
+
+        // Award 15 Soul Shards for consistent daily recording + bonus level shards
         val updatedIdentity = updatedIdentityTemp.copy(
-            soulShards = updatedIdentityTemp.soulShards + 15
+            soulShards = updatedIdentityTemp.soulShards + 15 + (levelOutcome?.shardsReward ?: 0),
+            soulLevel = newLevel,
+            soulExp = newExp,
+            totalSoulExp = newTotalExp,
+            unlockedArchetypeIds = updatedIdentityTemp.unlockedArchetypeIds + newlyUnlockedIds
         )
 
         // Save Record
@@ -177,6 +195,21 @@ class SoulRepository(private val soulDao: SoulDao) {
 
         // Update Profile
         soulDao.insertOrUpdateProfile(updatedIdentity.toEntity())
+
+        // Insert Level Up or Tier Ascension Event if triggered
+        if (levelOutcome != null) {
+            val dayNum = count + 2
+            soulDao.insertEvolutionEvent(
+                EvolutionEventEntity(
+                    dayNumber = dayNum,
+                    eventType = if (levelOutcome.tierPromoted) "TIER_ASCENSION" else "SOUL_LEVEL_UP",
+                    title = if (levelOutcome.tierPromoted) "Ascended to Tier ${levelOutcome.newTier.romanNumeral}: ${levelOutcome.newTier.title}" else "Soul Matrix Level ${levelOutcome.newLevel}",
+                    description = "Vessel reached Level ${levelOutcome.newLevel} (+${levelOutcome.levelsGained} levels). Awarded 💎 ${levelOutcome.shardsReward} Shards." +
+                            if (levelOutcome.newlyUnlockedArchetypes.isNotEmpty()) " Unlocked Archetypes: " + levelOutcome.newlyUnlockedArchetypes.joinToString { it.name } else "",
+                    runeIcon = levelOutcome.newTier.rune
+                )
+            )
+        }
 
         // Insert Evolution Event if triggered
         val dayNum = count + 2
@@ -369,22 +402,172 @@ class SoulRepository(private val soulDao: SoulDao) {
         true
     }
 
-    suspend fun claimAchievement(achievementId: String): Int = withContext(Dispatchers.IO) {
-        val profile = soulDao.getSoulProfile() ?: return@withContext 0
+    suspend fun addSoulExp(amount: Int): com.example.data.engine.LevelUpOutcome? = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext null
         val soul = profile.toSoulIdentity()
-        val definition = com.example.data.model.AchievementCatalog.DEFINITIONS.find { it.id == achievementId } ?: return@withContext 0
+        val (progressionTriple, outcome) = com.example.data.engine.SoulProgressionEngine.applyExpGain(
+            currentLevel = soul.soulLevel,
+            currentExp = soul.soulExp,
+            totalExp = soul.totalSoulExp,
+            gainedExp = amount,
+            alreadyUnlockedArchetypeIds = soul.unlockedArchetypeIds
+        )
+        val (newLevel, newExp, newTotalExp) = progressionTriple
+        val newlyUnlockedIds = outcome?.newlyUnlockedArchetypes?.map { it.id }?.toSet() ?: emptySet()
+        val updatedUnlocked = soul.unlockedArchetypeIds + newlyUnlockedIds
+        val updatedShards = soul.soulShards + (outcome?.shardsReward ?: 0)
+
+        val updatedTitle = if (outcome != null) {
+            com.example.data.engine.GodlyTitleEngine.computeGodlyTitle(
+                soul.copy(
+                    soulLevel = newLevel,
+                    soulExp = newExp,
+                    totalSoulExp = newTotalExp,
+                    unlockedArchetypeIds = updatedUnlocked
+                )
+            )
+        } else {
+            soul.currentTitle
+        }
+
+        val updatedSoul = soul.copy(
+            soulLevel = newLevel,
+            soulExp = newExp,
+            totalSoulExp = newTotalExp,
+            soulShards = updatedShards,
+            unlockedArchetypeIds = updatedUnlocked,
+            currentTitle = updatedTitle
+        )
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+
+        if (outcome != null) {
+            val count = soulDao.getRecordCount()
+            soulDao.insertEvolutionEvent(
+                EvolutionEventEntity(
+                    dayNumber = count + 1,
+                    eventType = if (outcome.tierPromoted) "TIER_ASCENSION" else "SOUL_LEVEL_UP",
+                    title = if (outcome.tierPromoted) "Ascended to Tier ${outcome.newTier.romanNumeral}: ${outcome.newTier.title}" else "Soul Matrix Level ${outcome.newLevel}",
+                    description = "Vessel reached Level ${outcome.newLevel} (+${outcome.levelsGained} levels). Bestowed Godly Title: [$updatedTitle]. Awarded 💎 ${outcome.shardsReward} Shards." +
+                            if (outcome.newlyUnlockedArchetypes.isNotEmpty()) " Unlocked Archetypes: " + outcome.newlyUnlockedArchetypes.joinToString { it.name } else "",
+                    runeIcon = outcome.newTier.rune
+                )
+            )
+        }
+        outcome
+    }
+
+    suspend fun attuneArchetype(archetypeId: String): Boolean = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext false
+        val soul = profile.toSoulIdentity()
+        if (soul.unlockedArchetypeIds.contains(archetypeId) || archetypeId == "arch_seeker") {
+            val archetypeDef = com.example.data.model.AdvancedArchetypesCatalog.getArchetypeById(archetypeId)
+            val tempSoul = soul.copy(
+                attunedArchetypeId = archetypeId,
+                archetype = archetypeDef.name,
+                element = archetypeDef.element,
+                className = archetypeDef.characterClass,
+                race = archetypeDef.celestialRace
+            )
+            val dynamicTitle = com.example.data.engine.GodlyTitleEngine.computeGodlyTitle(tempSoul)
+            val updated = tempSoul.copy(currentTitle = dynamicTitle)
+            soulDao.insertOrUpdateProfile(updated.toEntity())
+            true
+        } else {
+            false
+        }
+    }
+
+    suspend fun claimAchievement(achievementId: String): Pair<Int, com.example.data.engine.LevelUpOutcome?> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Pair(0, null)
+        val soul = profile.toSoulIdentity()
+        val definition = com.example.data.model.AchievementCatalog.DEFINITIONS.find { it.id == achievementId } ?: return@withContext Pair(0, null)
 
         if (!soul.claimedAchievementIds.contains(achievementId)) {
             val reward = definition.rewardShards
+            val gainedExp = 35
+
+            val (progressionTriple, outcome) = com.example.data.engine.SoulProgressionEngine.applyExpGain(
+                currentLevel = soul.soulLevel,
+                currentExp = soul.soulExp,
+                totalExp = soul.totalSoulExp,
+                gainedExp = gainedExp,
+                alreadyUnlockedArchetypeIds = soul.unlockedArchetypeIds
+            )
+            val (newLevel, newExp, newTotalExp) = progressionTriple
+            val newlyUnlockedIds = outcome?.newlyUnlockedArchetypes?.map { it.id }?.toSet() ?: emptySet()
+
             val updated = soul.copy(
-                soulShards = soul.soulShards + reward,
+                soulShards = soul.soulShards + reward + (outcome?.shardsReward ?: 0),
+                soulLevel = newLevel,
+                soulExp = newExp,
+                totalSoulExp = newTotalExp,
+                unlockedArchetypeIds = soul.unlockedArchetypeIds + newlyUnlockedIds,
                 claimedAchievementIds = soul.claimedAchievementIds + achievementId
             )
             soulDao.insertOrUpdateProfile(updated.toEntity())
-            reward
+
+            if (outcome != null) {
+                val count = soulDao.getRecordCount()
+                soulDao.insertEvolutionEvent(
+                    EvolutionEventEntity(
+                        dayNumber = count + 1,
+                        eventType = if (outcome.tierPromoted) "TIER_ASCENSION" else "SOUL_LEVEL_UP",
+                        title = if (outcome.tierPromoted) "Ascended to Tier ${outcome.newTier.romanNumeral}: ${outcome.newTier.title}" else "Soul Matrix Level ${outcome.newLevel}",
+                        description = "Vessel reached Level ${outcome.newLevel}. Awarded 💎 ${outcome.shardsReward} Shards.",
+                        runeIcon = outcome.newTier.rune
+                    )
+                )
+            }
+            Pair(reward, outcome)
         } else {
-            0
+            Pair(0, null)
         }
+    }
+
+    suspend fun claimAllAchievements(): Pair<Int, com.example.data.engine.LevelUpOutcome?> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Pair(0, null)
+        val soul = profile.toSoulIdentity()
+        val achievements = computeAchievements()
+        val unclaimedUnlocked = achievements.filter { it.isUnlocked && !it.isClaimed }
+        if (unclaimedUnlocked.isEmpty()) return@withContext Pair(0, null)
+
+        val totalReward = unclaimedUnlocked.sumOf { it.rewardShards }
+        val gainedExp = unclaimedUnlocked.size * 35
+
+        val (progressionTriple, outcome) = com.example.data.engine.SoulProgressionEngine.applyExpGain(
+            currentLevel = soul.soulLevel,
+            currentExp = soul.soulExp,
+            totalExp = soul.totalSoulExp,
+            gainedExp = gainedExp,
+            alreadyUnlockedArchetypeIds = soul.unlockedArchetypeIds
+        )
+        val (newLevel, newExp, newTotalExp) = progressionTriple
+        val newlyUnlockedIds = outcome?.newlyUnlockedArchetypes?.map { it.id }?.toSet() ?: emptySet()
+
+        val newClaimedIds = soul.claimedAchievementIds + unclaimedUnlocked.map { it.id }.toSet()
+        val updated = soul.copy(
+            soulShards = soul.soulShards + totalReward + (outcome?.shardsReward ?: 0),
+            soulLevel = newLevel,
+            soulExp = newExp,
+            totalSoulExp = newTotalExp,
+            unlockedArchetypeIds = soul.unlockedArchetypeIds + newlyUnlockedIds,
+            claimedAchievementIds = newClaimedIds
+        )
+        soulDao.insertOrUpdateProfile(updated.toEntity())
+
+        if (outcome != null) {
+            val count = soulDao.getRecordCount()
+            soulDao.insertEvolutionEvent(
+                EvolutionEventEntity(
+                    dayNumber = count + 1,
+                    eventType = if (outcome.tierPromoted) "TIER_ASCENSION" else "SOUL_LEVEL_UP",
+                    title = if (outcome.tierPromoted) "Ascended to Tier ${outcome.newTier.romanNumeral}: ${outcome.newTier.title}" else "Soul Matrix Level ${outcome.newLevel}",
+                    description = "Vessel reached Level ${outcome.newLevel}. Awarded 💎 ${outcome.shardsReward} Shards.",
+                    runeIcon = outcome.newTier.rune
+                )
+            )
+        }
+        Pair(totalReward, outcome)
     }
 
     suspend fun computeAchievements(): List<com.example.data.model.Achievement> = withContext(Dispatchers.IO) {
@@ -401,20 +584,38 @@ class SoulRepository(private val soulDao: SoulDao) {
         val highestVirtue = profile.virtueScores.values.maxOrNull() ?: 30
         val unlockedCosmeticsCount = profile.unlockedEffectIds.size
 
+        val shadowScores = profile.shadowScores
+        val virtueScores = profile.virtueScores
+        val resonancePercent = (profile.stability * 0.5f + profile.humanity * 0.5f).toInt().coerceIn(10, 100)
+
         com.example.data.model.AchievementCatalog.DEFINITIONS.map { def ->
-            val progress = when (def.id) {
-                "first_record" -> recordCount
-                "five_records" -> recordCount
-                "ten_records" -> recordCount
-                "first_trial" -> if (recordCount > 0) 1 else 0
-                "three_trials" -> recordCount.coerceAtMost(3)
-                "first_cosmetic" -> unlockedCosmeticsCount.coerceAtLeast(if (profile.equippedEffectId != "effect_default") 1 else 0)
-                "three_cosmetics" -> unlockedCosmeticsCount
-                "high_humanity" -> profile.humanity
-                "high_stability" -> profile.stability
-                "shadow_master" -> highestShadow
-                "virtue_master" -> highestVirtue
-                "shard_collector" -> profile.soulShards
+            val progress = when {
+                def.id == "first_record" || def.id == "five_records" || def.id == "ten_records" -> recordCount
+                def.id.startsWith("inscr_") -> recordCount
+                def.id == "first_trial" || def.id == "three_trials" -> recordCount
+                def.id == "first_cosmetic" || def.id == "three_cosmetics" -> unlockedCosmeticsCount.coerceAtLeast(if (profile.equippedEffectId != "effect_default") 1 else 0)
+                def.id.startsWith("cosmetic_") -> unlockedCosmeticsCount.coerceAtLeast(if (profile.equippedEffectId != "effect_default") 1 else 0)
+                def.id == "high_humanity" || def.id.startsWith("humanity_") -> profile.humanity
+                def.id == "high_stability" || def.id.startsWith("stability_") -> profile.stability
+                def.id == "shadow_master" -> highestShadow
+                def.id == "virtue_master" -> highestVirtue
+                def.id == "shard_collector" || def.id.startsWith("wealth_") -> profile.soulShards
+                def.id.startsWith("resonance_") -> resonancePercent
+                def.id.startsWith("metamorph_") -> profile.evolutionProgress
+                def.id.startsWith("virtue_humility_") -> virtueScores[com.example.data.model.VirtueType.HUMILITY] ?: 30
+                def.id.startsWith("virtue_charity_") -> virtueScores[com.example.data.model.VirtueType.CHARITY] ?: 30
+                def.id.startsWith("virtue_courage_") -> virtueScores[com.example.data.model.VirtueType.COURAGE] ?: 30
+                def.id.startsWith("virtue_gratitude_") -> virtueScores[com.example.data.model.VirtueType.GRATITUDE] ?: 30
+                def.id.startsWith("virtue_temperance_") -> virtueScores[com.example.data.model.VirtueType.TEMPERANCE] ?: 30
+                def.id.startsWith("virtue_patience_") -> virtueScores[com.example.data.model.VirtueType.PATIENCE] ?: 30
+                def.id.startsWith("virtue_diligence_") -> virtueScores[com.example.data.model.VirtueType.DILIGENCE] ?: 30
+                def.id.startsWith("shadow_pride_") -> shadowScores[com.example.data.model.ShadowType.PRIDE] ?: 30
+                def.id.startsWith("shadow_greed_") -> shadowScores[com.example.data.model.ShadowType.GREED] ?: 30
+                def.id.startsWith("shadow_desire_") -> shadowScores[com.example.data.model.ShadowType.DESIRE] ?: 30
+                def.id.startsWith("shadow_envy_") -> shadowScores[com.example.data.model.ShadowType.ENVY] ?: 30
+                def.id.startsWith("shadow_gluttony_") -> shadowScores[com.example.data.model.ShadowType.GLUTTONY] ?: 30
+                def.id.startsWith("shadow_wrath_") -> shadowScores[com.example.data.model.ShadowType.WRATH] ?: 30
+                def.id.startsWith("shadow_sloth_") -> shadowScores[com.example.data.model.ShadowType.SLOTH] ?: 30
                 else -> 0
             }
             val isUnlocked = progress >= def.target
@@ -871,6 +1072,15 @@ class SoulRepository(private val soulDao: SoulDao) {
             for (i in 0 until arr.length()) claimedSet.add(arr.getString(i))
         } catch (_: Exception) {}
 
+        val unlockedArchetypes = mutableSetOf<String>("arch_seeker")
+        try {
+            val arr = JSONArray(unlockedArchetypesJson)
+            for (i in 0 until arr.length()) unlockedArchetypes.add(arr.getString(i))
+        } catch (_: Exception) {}
+
+        // Add starter archetype if not present
+        unlockedArchetypes.add("arch_seeker")
+
         return SoulIdentity(
             race = race,
             className = className,
@@ -891,6 +1101,11 @@ class SoulRepository(private val soulDao: SoulDao) {
             weaknesses = weaknesses.ifEmpty { listOf("Uncalibrated Forces") },
             systemMessage = systemMessage,
             soulShards = soulShards,
+            soulLevel = soulLevel.coerceAtLeast(1),
+            soulExp = soulExp.coerceAtLeast(0),
+            totalSoulExp = totalSoulExp.coerceAtLeast(0),
+            attunedArchetypeId = attunedArchetypeId.ifBlank { "arch_seeker" },
+            unlockedArchetypeIds = unlockedArchetypes,
             equippedEffectId = equippedEffectId,
             unlockedEffectIds = unlockedSet,
             claimedAchievementIds = claimedSet
@@ -910,6 +1125,7 @@ class SoulRepository(private val soulDao: SoulDao) {
         val weaknessesArr = JSONArray(weaknesses).toString()
         val unlockedArr = JSONArray(unlockedEffectIds).toString()
         val claimedArr = JSONArray(claimedAchievementIds).toString()
+        val unlockedArchArr = JSONArray(unlockedArchetypeIds).toString()
 
         return SoulProfileEntity(
             id = 1,
@@ -932,6 +1148,11 @@ class SoulRepository(private val soulDao: SoulDao) {
             weaknessesJson = weaknessesArr,
             systemMessage = systemMessage,
             soulShards = soulShards,
+            soulLevel = soulLevel,
+            soulExp = soulExp,
+            totalSoulExp = totalSoulExp,
+            attunedArchetypeId = attunedArchetypeId,
+            unlockedArchetypesJson = unlockedArchArr,
             equippedEffectId = equippedEffectId,
             unlockedEffectsJson = unlockedArr,
             claimedAchievementsJson = claimedArr
