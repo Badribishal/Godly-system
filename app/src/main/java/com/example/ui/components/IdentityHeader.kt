@@ -12,16 +12,21 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -387,187 +392,222 @@ fun IdentityHeader(
                 }
             }
 
-            // QI CULTIVATION & SPIRIT TREASURY STATUS CARD
-            Card(
+            // QI CULTIVATION & SPIRIT TREASURY STATUS CARD (Fixed Aspect Ratio & Adaptive Constraint Layout)
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(
-                        1.2.dp,
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color(realm.colorHex).copy(alpha = 0.85f),
-                                RadiantGold.copy(alpha = 0.6f),
-                                EtherealCyan.copy(alpha = 0.5f)
-                            )
-                        ),
-                        RoundedCornerShape(18.dp)
-                    )
-                    .testTag("qi_cultivation_header_card"),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF0A0D1A)
-                )
+                    .widthIn(max = 600.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Header Row: Realm, Stage & Gem Counter
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                color = Color(realm.colorHex).copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(8.dp),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex))
-                            ) {
-                                Text(
-                                    text = "${realm.runeSymbol} ${realm.displayName}",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = Color(realm.colorHex),
-                                    fontSize = 12.sp
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(3.3f, matchHeightConstraintsFirst = false)
+                        .heightIn(min = 104.dp, max = 136.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(
+                            1.2.dp,
+                            Brush.horizontalGradient(
+                                listOf(
+                                    Color(realm.colorHex).copy(alpha = 0.85f),
+                                    RadiantGold.copy(alpha = 0.6f),
+                                    EtherealCyan.copy(alpha = 0.5f)
                                 )
-                            }
-
-                            Column {
-                                Text(
-                                    text = "${realm.displayName} • Stage ${soul.cultivationStage}/${realm.maxStages}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${soul.currentQi} / ${soul.maxQi} Qi (${(qiRatio * 100).toInt()}%)",
-                                    fontSize = 10.sp,
-                                    color = if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-
-                        // Gem Counter Chip with Treasury Link
-                        Surface(
-                            modifier = Modifier.clickable(enabled = onOpenTreasury != null) { onOpenTreasury?.invoke() },
-                            color = RadiantGold.copy(alpha = 0.18f),
-                            shape = RoundedCornerShape(10.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text("💎", fontSize = 12.sp)
-                                Text(
-                                    text = "${soul.soulShards}",
-                                    color = RadiantGoldBright,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                                Text("Shop ›", fontSize = 10.sp, color = TextGold)
-                            }
-                        }
-                    }
-
-                    // Linear Qi Reservoir Progress Bar
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(7.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF1B2236))
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(qiRatio.coerceIn(0.02f, 1f))
-                                .fillMaxHeight()
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(
-                                            Color(realm.colorHex),
-                                            if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan
-                                        )
-                                    )
-                                )
+                            ),
+                            RoundedCornerShape(18.dp)
                         )
-                    }
-
-                    // Footer Row: Equipped Relic / Spiritual Root & Action Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        .testTag("qi_cultivation_header_card"),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF0A0D1A)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // Header Row: Realm Badge, Stage/Qi Stats & Diamond Gem Counter Chip
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            if (equippedArtifact != null) {
-                                Text(text = equippedArtifact.iconEmoji, fontSize = 12.sp)
-                                Text(
-                                    text = "[${equippedArtifact.name}] equipped",
-                                    fontSize = 10.5.sp,
-                                    color = Color(equippedArtifact.colorHex),
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                            } else {
-                                Text(
-                                    text = "Root: ${soul.spiritualRoots}",
-                                    fontSize = 10.5.sp,
-                                    color = TextMuted,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (onOpenQiChamber != null) {
+                            Row(
+                                modifier = Modifier.weight(1f, fill = false),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Surface(
-                                    modifier = Modifier
-                                        .clickable { onOpenQiChamber() }
-                                        .testTag("open_qi_chamber_header_btn"),
                                     color = Color(realm.colorHex).copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(8.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex).copy(alpha = 0.6f))
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex).copy(alpha = 0.7f))
                                 ) {
                                     Text(
-                                        text = "⚡ Qi Chamber",
+                                        text = "${realm.runeSymbol} ${realm.displayName}",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                        fontWeight = FontWeight.ExtraBold,
                                         color = Color(realm.colorHex),
-                                        fontSize = 10.5.sp,
+                                        fontSize = 11.5.sp,
+                                        maxLines = 1
+                                    )
+                                }
+
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                    Text(
+                                        text = "Stage ${soul.cultivationStage}/${realm.maxStages}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = TextPrimary,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${soul.currentQi}/${soul.maxQi} Qi (${(qiRatio * 100).toInt()}%)",
+                                        fontSize = 10.sp,
+                                        color = if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
                                 }
                             }
 
-                            if (onOpenTreasury != null) {
-                                Surface(
-                                    modifier = Modifier
-                                        .clickable { onOpenTreasury() }
-                                        .testTag("open_treasury_header_btn"),
-                                    color = RadiantGold.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Diamond / Gem Counter Chip with Treasury Link (Fixed horizontal row, shrink-safe)
+                            Surface(
+                                modifier = Modifier
+                                    .clickable(enabled = onOpenTreasury != null) { onOpenTreasury?.invoke() }
+                                    .testTag("qi_gem_counter_chip"),
+                                color = RadiantGold.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
+                                    Text("💎", fontSize = 12.sp)
                                     Text(
-                                        text = "🏛️ Treasury",
+                                        text = "${soul.soulShards}",
                                         color = RadiantGoldBright,
-                                        fontSize = 10.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        fontSize = 11.5.sp,
+                                        maxLines = 1
                                     )
+                                    Text(
+                                        text = "Shop ›",
+                                        fontSize = 9.5.sp,
+                                        color = TextGold,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+
+                        // Linear Qi Reservoir Progress Bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(7.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF1B2236))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(qiRatio.coerceIn(0.02f, 1f))
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(
+                                                Color(realm.colorHex),
+                                                if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan
+                                            )
+                                        )
+                                    )
+                            )
+                        }
+
+                        // Footer Row: Equipped Relic / Spiritual Root & Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                if (equippedArtifact != null) {
+                                    Text(text = equippedArtifact.iconEmoji, fontSize = 11.5.sp)
+                                    Text(
+                                        text = "[${equippedArtifact.name}]",
+                                        fontSize = 10.sp,
+                                        color = Color(equippedArtifact.colorHex),
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Root: ${soul.spiritualRoots}",
+                                        fontSize = 10.sp,
+                                        color = TextMuted,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(6.dp))
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (onOpenQiChamber != null) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .clickable { onOpenQiChamber() }
+                                            .testTag("open_qi_chamber_header_btn"),
+                                        color = Color(realm.colorHex).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex).copy(alpha = 0.6f))
+                                    ) {
+                                        Text(
+                                            text = "⚡ Qi Chamber",
+                                            color = Color(realm.colorHex),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+
+                                if (onOpenTreasury != null) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .clickable { onOpenTreasury() }
+                                            .testTag("open_treasury_header_btn"),
+                                        color = RadiantGold.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
+                                    ) {
+                                        Text(
+                                            text = "🏛️ Treasury",
+                                            color = RadiantGoldBright,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
                         }

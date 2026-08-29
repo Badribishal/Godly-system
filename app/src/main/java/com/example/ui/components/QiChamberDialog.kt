@@ -229,21 +229,26 @@ fun QiChamberDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
                                     Text(
                                         text = "CURRENT REALM",
                                         color = TextMuted,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        letterSpacing = 1.sp
+                                        letterSpacing = 1.sp,
+                                        maxLines = 1
                                     )
                                     Text(
                                         text = "${realm.displayName} • Stage ${soul.cultivationStage}/${realm.maxStages}",
                                         color = Color(realm.colorHex),
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
+                                        fontSize = 15.sp,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Surface(
                                     color = RadiantGold.copy(alpha = 0.15f),
@@ -260,7 +265,8 @@ fun QiChamberDialog(
                                             text = "${soul.soulShards} Gems",
                                             color = TextGold,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                            fontSize = 13.sp,
+                                            maxLines = 1
                                         )
                                     }
                                 }
