@@ -189,7 +189,6 @@ fun OracleMessageCard(
                         text = "“${oracle.mysticReflection}”",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextPrimary,
-                        fontFamily = FontFamily.Serif,
                         fontStyle = FontStyle.Italic,
                         lineHeight = 20.sp,
                         fontSize = 14.sp

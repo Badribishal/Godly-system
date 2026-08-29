@@ -182,8 +182,7 @@ fun SoulExpTimelineChart(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             color = RadiantGold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.2.sp
+                            letterSpacing = 0.5.sp
                         )
                     }
                     Text(
@@ -428,8 +427,7 @@ private fun MetricKpiCard(
                 text = value,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold,
-                color = accentColor,
-                fontFamily = FontFamily.Serif
+                color = accentColor
             )
             Text(
                 text = subText,
@@ -599,8 +597,7 @@ private fun InteractiveRechartsCanvas(
                 topLeft = Offset(4f, yPos - 10f),
                 style = TextStyle(
                     color = TextMuted.copy(alpha = 0.8f),
-                    fontSize = 8.5.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontSize = 8.5.sp
                 )
             )
         }

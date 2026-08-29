@@ -180,8 +180,7 @@ fun SoulRecordDialog(
                                 style = MaterialTheme.typography.titleLarge,
                                 color = RadiantGoldBright,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif,
-                                fontSize = 17.sp
+                                fontSize = 16.sp
                             )
                             Text(
                                 text = "52+ Positive & Negative Emotions • 14 Primal Forces",
@@ -243,7 +242,7 @@ fun SoulRecordDialog(
                                 else "« $totalSelected Catalysts Selected »",
                                 fontSize = 11.sp,
                                 color = RadiantGold,
-                                fontFamily = FontFamily.Serif
+                                fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = "${selectedVirtues.size} Virtues Active",

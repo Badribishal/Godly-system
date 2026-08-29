@@ -186,8 +186,7 @@ fun SettingsDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontFamily = FontFamily.Serif,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "Themes & Multi-Format File Backup",
@@ -362,8 +361,7 @@ fun SettingsDialog(
                                         Text(
                                             text = "« ${activeArchetypeTheme.flavorDescription} »",
                                             fontSize = 9.5.sp,
-                                            color = TextMuted,
-                                            fontFamily = FontFamily.Serif
+                                            color = TextMuted
                                         )
                                     }
                                 }

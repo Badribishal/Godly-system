@@ -1,5 +1,7 @@
 package com.example.data.repository
 
+import com.example.data.engine.BreakthroughResult
+import com.example.data.engine.CauldronRefineResult
 import com.example.data.engine.DailyFantasyArchetypeResult
 import com.example.data.engine.FantasyArchetypeEvaluationEngine
 import com.example.data.engine.PersonalityEvaluationEngine
@@ -496,6 +498,176 @@ class SoulRepository(private val soulDao: SoulDao) {
         } else {
             false
         }
+    }
+
+    // === QI CULTIVATION & SPIRIT TREASURY OPERATIONS ===
+
+    suspend fun gatherQi(amount: Int): SoulIdentity = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext SoulIdentity.initial()
+        val soul = profile.toSoulIdentity()
+        val newQi = (soul.currentQi + amount).coerceAtMost(soul.maxQi)
+        val updated = soul.copy(currentQi = newQi)
+        soulDao.insertOrUpdateProfile(updated.toEntity())
+        updated
+    }
+
+    suspend fun performBreakthrough(): BreakthroughResult = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext com.example.data.engine.QiCultivationEngine.performBreakthrough(SoulIdentity.initial())
+        val soul = profile.toSoulIdentity()
+
+        val activeBonus = if (soul.activeTribulationTalismanCount > 0) 100 else 0
+        val result = com.example.data.engine.QiCultivationEngine.performBreakthrough(soul, activeBonus)
+
+        val finalSoul = if (soul.activeTribulationTalismanCount > 0 && result.success) {
+            result.updatedSoul.copy(activeTribulationTalismanCount = soul.activeTribulationTalismanCount - 1)
+        } else {
+            result.updatedSoul
+        }
+
+        soulDao.insertOrUpdateProfile(finalSoul.toEntity())
+
+        val eventCount = soulDao.getRecordCount()
+        if (result.success) {
+            soulDao.insertEvolutionEvent(
+                EvolutionEventEntity(
+                    dayNumber = eventCount + 1,
+                    eventType = if (result.isMajorRealmBreakthrough) "CULTIVATION_MAJOR_ASCENSION" else "CULTIVATION_STAGE_BREAKTHROUGH",
+                    title = if (result.isMajorRealmBreakthrough) "Ascended to Realm: ${result.newRealm.displayName}" else "Cultivation Stage Breakthrough: ${result.newRealm.displayName} Stage ${result.newStage}",
+                    description = result.omenMessage + (result.titleBestowed?.let { " Granted Dao Title: [$it]." } ?: "") + " +💎 ${result.shardsAwarded} Shards, +${result.evolutionBonus}% Evolution.",
+                    runeIcon = result.newRealm.runeSymbol
+                )
+            )
+        } else {
+            soulDao.insertEvolutionEvent(
+                EvolutionEventEntity(
+                    dayNumber = eventCount + 1,
+                    eventType = "TRIBULATION_BACKLASH",
+                    title = "Tribulation Backlash: ${result.oldRealm.displayName}",
+                    description = result.omenMessage,
+                    runeIcon = "⚠️"
+                )
+            )
+        }
+
+        result.copy(updatedSoul = finalSoul)
+    }
+
+    suspend fun purchaseSpiritItem(itemId: String): Result<Pair<SoulIdentity, String>> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Soul profile not found"))
+        val soul = profile.toSoulIdentity()
+        val item = com.example.data.model.SpiritTreasuryCatalog.getItemById(itemId) 
+            ?: return@withContext Result.failure(Exception("Spiritual item does not exist"))
+
+        if (soul.soulShards < item.gemCost) {
+            return@withContext Result.failure(Exception("Insufficient Gems! Requires 💎 ${item.gemCost} (You have 💎 ${soul.soulShards})"))
+        }
+
+        val newShards = soul.soulShards - item.gemCost
+        var newQi = soul.currentQi + item.qiBonus
+        var newMaxQi = soul.maxQi + item.maxQiBonus
+        var newStability = (soul.stability + item.stabilityBonus).coerceIn(0, 100)
+        var newHumanity = (soul.humanity + item.humanityBonus).coerceIn(0, 100)
+        var newTalismanCount = soul.activeTribulationTalismanCount
+        val newUnlockedArtifacts = soul.unlockedArtifactIds.toMutableSet()
+        var newEquippedArtifact = soul.equippedArtifactId
+
+        if (item.type == com.example.data.model.SpiritItemType.TRIBULATION_TALISMAN) {
+            newTalismanCount += 1
+        }
+
+        if (item.isPermanentArtifact) {
+            newUnlockedArtifacts.add(item.id)
+            if (item.type == com.example.data.model.SpiritItemType.SPIRIT_ARTIFACT && soul.equippedArtifactId == "artifact_none") {
+                newEquippedArtifact = item.id
+            }
+        }
+
+        newQi = newQi.coerceAtMost(newMaxQi)
+
+        val updatedSoul = soul.copy(
+            soulShards = newShards,
+            currentQi = newQi,
+            maxQi = newMaxQi,
+            stability = newStability,
+            humanity = newHumanity,
+            unlockedArtifactIds = newUnlockedArtifacts,
+            equippedArtifactId = newEquippedArtifact,
+            activeTribulationTalismanCount = newTalismanCount
+        )
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+
+        val eventCount = soulDao.getRecordCount()
+        soulDao.insertEvolutionEvent(
+            EvolutionEventEntity(
+                dayNumber = eventCount + 1,
+                eventType = "SPIRIT_TREASURY_ACQUISITION",
+                title = "Treasury Acquired: ${item.name}",
+                description = "Spent 💎 ${item.gemCost} gems. " + item.description,
+                runeIcon = item.iconEmoji
+            )
+        )
+
+        val feedback = "✨ Acquired [${item.name}]! " + 
+            (if (item.qiBonus > 0) "+${item.qiBonus} Qi " else "") +
+            (if (item.maxQiBonus > 0) "+${item.maxQiBonus} Max Qi " else "") +
+            (if (item.stabilityBonus > 0) "+${item.stabilityBonus} Stability " else "") +
+            (if (item.humanityBonus > 0) "+${item.humanityBonus} Humanity " else "") +
+            (if (item.isPermanentArtifact) "Permanently Bound to Soul Matrix!" else "")
+
+        Result.success(Pair(updatedSoul, feedback))
+    }
+
+    suspend fun refineInCauldron(gemCost: Int = 50): Result<CauldronRefineResult> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Soul profile not found"))
+        val soul = profile.toSoulIdentity()
+
+        if (soul.soulShards < gemCost) {
+            return@withContext Result.failure(Exception("Insufficient Gems! Requires 💎 $gemCost (You have 💎 ${soul.soulShards})"))
+        }
+
+        val refineResult = com.example.data.engine.QiCultivationEngine.refineElixirInCauldron(soul, gemCost)
+        val newShards = soul.soulShards - gemCost
+        val newQi = (soul.currentQi + refineResult.qiGained).coerceAtMost(soul.maxQi)
+        val newMaxQi = soul.maxQi + refineResult.itemAwarded.maxQiBonus
+        val newStability = (soul.stability + refineResult.itemAwarded.stabilityBonus).coerceIn(0, 100)
+        val newHumanity = (soul.humanity + refineResult.itemAwarded.humanityBonus).coerceIn(0, 100)
+
+        val updatedSoul = soul.copy(
+            soulShards = newShards,
+            currentQi = newQi,
+            maxQi = newMaxQi,
+            stability = newStability,
+            humanity = newHumanity
+        )
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+
+        val eventCount = soulDao.getRecordCount()
+        soulDao.insertEvolutionEvent(
+            EvolutionEventEntity(
+                dayNumber = eventCount + 1,
+                eventType = "ALCHEMY_CAULDRON_REFINEMENT",
+                title = "Alchemical Distillation: ${refineResult.itemAwarded.name}",
+                description = "Spent 💎 $gemCost gems. Distilled ${refineResult.itemAwarded.name} and gathered +${refineResult.qiGained} Qi.",
+                runeIcon = "🔥"
+            )
+        )
+
+        Result.success(refineResult)
+    }
+
+    suspend fun equipArtifact(artifactId: String): Result<SoulIdentity> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Profile not found"))
+        val soul = profile.toSoulIdentity()
+
+        if (artifactId != "artifact_none" && !soul.unlockedArtifactIds.contains(artifactId)) {
+            return@withContext Result.failure(Exception("Artifact is not unlocked yet"))
+        }
+
+        val updatedSoul = soul.copy(equippedArtifactId = artifactId)
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+        Result.success(updatedSoul)
     }
 
     suspend fun addSoulShards(amount: Int): Boolean = withContext(Dispatchers.IO) {
@@ -1134,6 +1306,127 @@ class SoulRepository(private val soulDao: SoulDao) {
         }
     }
 
+    // === ELEMENTAL POWERS & ARTS OPERATIONS ===
+
+    suspend fun equipElementalPower(powerId: String, category: com.example.data.model.PowerCategory): Result<SoulIdentity> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Profile not found"))
+        val soul = profile.toSoulIdentity()
+        val power = com.example.data.model.ElementalPowersCatalog.getPowerById(powerId)
+            ?: return@withContext Result.failure(Exception("Power does not exist"))
+
+        val updatedSoul = when (category) {
+            com.example.data.model.PowerCategory.ATTACK_ART -> soul.copy(equippedAttackId = powerId)
+            com.example.data.model.PowerCategory.MANIPULATION_ART -> soul.copy(equippedManipulationId = powerId)
+            com.example.data.model.PowerCategory.SUPPORT_CLASS -> soul.copy(equippedSupportId = powerId)
+            com.example.data.model.PowerCategory.HEALING_CLASS -> soul.copy(equippedHealingId = powerId)
+            com.example.data.model.PowerCategory.PASSIVE_TRAIT -> soul.copy(equippedTraitId = powerId)
+        }
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+        Result.success(updatedSoul)
+    }
+
+    suspend fun setPrimaryElement(elementName: String): Result<SoulIdentity> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Profile not found"))
+        val soul = profile.toSoulIdentity()
+        val elem = com.example.data.model.ElementType.fromString(elementName)
+        val powers = com.example.data.model.ElementalPowersCatalog.getPowersByElement(elem)
+        val attack = powers.firstOrNull { it.category == com.example.data.model.PowerCategory.ATTACK_ART }?.id ?: soul.equippedAttackId
+        val manipulation = powers.firstOrNull { it.category == com.example.data.model.PowerCategory.MANIPULATION_ART }?.id ?: soul.equippedManipulationId
+        val support = powers.firstOrNull { it.category == com.example.data.model.PowerCategory.SUPPORT_CLASS }?.id ?: soul.equippedSupportId
+        val healing = powers.firstOrNull { it.category == com.example.data.model.PowerCategory.HEALING_CLASS }?.id ?: soul.equippedHealingId
+        val trait = powers.firstOrNull { it.category == com.example.data.model.PowerCategory.PASSIVE_TRAIT }?.id ?: soul.equippedTraitId
+
+        val updatedSoul = soul.copy(
+            primaryElement = elem.displayName,
+            element = "${elem.displayName} / ${elem.masteryTitle}",
+            equippedAttackId = attack,
+            equippedManipulationId = manipulation,
+            equippedSupportId = support,
+            equippedHealingId = healing,
+            equippedTraitId = trait
+        )
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+        Result.success(updatedSoul)
+    }
+
+    suspend fun trainPowerMastery(powerId: String, qiCost: Int = 50): Result<Pair<SoulIdentity, Int>> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Profile not found"))
+        val soul = profile.toSoulIdentity()
+        val power = com.example.data.model.ElementalPowersCatalog.getPowerById(powerId)
+            ?: return@withContext Result.failure(Exception("Power does not exist"))
+
+        val currentMastery = soul.powerMasteryMap[powerId] ?: 1
+        if (currentMastery >= 5) {
+            return@withContext Result.failure(Exception("Power is already at Pinnacle Mastery (Tier 5)!"))
+        }
+
+        val requiredQi = qiCost * currentMastery
+        if (soul.currentQi < requiredQi) {
+            return@withContext Result.failure(Exception("Insufficient Qi! Requires $requiredQi Qi (You have ${soul.currentQi})"))
+        }
+
+        val newMasteryMap = soul.powerMasteryMap.toMutableMap().apply {
+            put(powerId, currentMastery + 1)
+        }
+        val newQi = soul.currentQi - requiredQi
+        val newShards = soul.soulShards + 15
+        val updatedSoul = soul.copy(
+            currentQi = newQi,
+            soulShards = newShards,
+            powerMasteryMap = newMasteryMap
+        )
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+
+        val eventCount = soulDao.getRecordCount()
+        soulDao.insertEvolutionEvent(
+            EvolutionEventEntity(
+                dayNumber = eventCount + 1,
+                eventType = "POWER_MASTERY_UPGRADE",
+                title = "Mastery Breakthrough: ${power.name}",
+                description = "Deepened elemental comprehension to Tier ${currentMastery + 1}/5! Awarded 💎 15 Shards.",
+                runeIcon = power.runeSymbol
+            )
+        )
+
+        Result.success(Pair(updatedSoul, currentMastery + 1))
+    }
+
+    suspend fun channelPowerArt(powerId: String): Result<Pair<SoulIdentity, String>> = withContext(Dispatchers.IO) {
+        val profile = soulDao.getSoulProfile() ?: return@withContext Result.failure(Exception("Profile not found"))
+        val soul = profile.toSoulIdentity()
+        val power = com.example.data.model.ElementalPowersCatalog.getPowerById(powerId)
+            ?: return@withContext Result.failure(Exception("Power not found"))
+
+        if (soul.currentQi < power.qiCost) {
+            return@withContext Result.failure(Exception("Insufficient Qi to channel ${power.name}! Requires ${power.qiCost} Qi (You have ${soul.currentQi})."))
+        }
+
+        val mastery = soul.powerMasteryMap[powerId] ?: 1
+        val newQi = (soul.currentQi - power.qiCost).coerceAtLeast(0)
+        var newStability = soul.stability
+        var newHumanity = soul.humanity
+        var newExp = soul.soulExp + 10 * mastery
+
+        if (power.category == com.example.data.model.PowerCategory.HEALING_CLASS) {
+            newStability = (soul.stability + 2 * mastery).coerceIn(0, 100)
+            newHumanity = (soul.humanity + 2 * mastery).coerceIn(0, 100)
+        }
+
+        val updatedSoul = soul.copy(
+            currentQi = newQi,
+            stability = newStability,
+            humanity = newHumanity,
+            soulExp = newExp
+        )
+
+        soulDao.insertOrUpdateProfile(updatedSoul.toEntity())
+        val feedback = "✨ Channeled [${power.name}] (Tier $mastery)! ${power.combatEffect} | ${power.mindSpiritEffect}"
+        Result.success(Pair(updatedSoul, feedback))
+    }
+
     // Converters
     private fun SoulProfileEntity.toSoulIdentity(): SoulIdentity {
         val shadowMap = mutableMapOf<ShadowType, Int>()
@@ -1185,6 +1478,30 @@ class SoulRepository(private val soulDao: SoulDao) {
         // Add starter archetype if not present
         unlockedArchetypes.add("arch_seeker")
 
+        val unlockedArtifacts = mutableSetOf<String>()
+        try {
+            val arr = JSONArray(unlockedArtifactsJson)
+            for (i in 0 until arr.length()) unlockedArtifacts.add(arr.getString(i))
+        } catch (_: Exception) {}
+
+        val unlockedPowers = mutableSetOf<String>()
+        try {
+            val arr = JSONArray(unlockedPowersJson)
+            for (i in 0 until arr.length()) unlockedPowers.add(arr.getString(i))
+        } catch (_: Exception) {}
+
+        if (unlockedPowers.isEmpty()) {
+            com.example.data.model.ElementalPowersCatalog.ALL_POWERS.forEach { unlockedPowers.add(it.id) }
+        }
+
+        val masteryMap = mutableMapOf<String, Int>()
+        try {
+            val obj = JSONObject(powerMasteryJson)
+            obj.keys().forEach { key ->
+                masteryMap[key] = obj.getInt(key)
+            }
+        } catch (_: Exception) {}
+
         return SoulIdentity(
             race = race,
             className = className,
@@ -1212,7 +1529,23 @@ class SoulRepository(private val soulDao: SoulDao) {
             unlockedArchetypeIds = unlockedArchetypes,
             equippedEffectId = equippedEffectId,
             unlockedEffectIds = unlockedSet,
-            claimedAchievementIds = claimedSet
+            claimedAchievementIds = claimedSet,
+            currentQi = currentQi,
+            maxQi = maxQi.coerceAtLeast(100),
+            cultivationRealm = cultivationRealm,
+            cultivationStage = cultivationStage.coerceAtLeast(1),
+            spiritualRoots = spiritualRoots,
+            equippedArtifactId = equippedArtifactId,
+            unlockedArtifactIds = unlockedArtifacts,
+            activeTribulationTalismanCount = activeTribulationTalismanCount,
+            primaryElement = primaryElement.ifBlank { "Fire" },
+            equippedAttackId = equippedAttackId.ifBlank { "atk_fire_sunflare" },
+            equippedManipulationId = equippedManipulationId.ifBlank { "man_fire_pyrokinesis" },
+            equippedSupportId = equippedSupportId.ifBlank { "sup_fire_blaze_mantle" },
+            equippedHealingId = equippedHealingId.ifBlank { "heal_fire_phoenix_rebirth" },
+            equippedTraitId = equippedTraitId.ifBlank { "trait_fire_pyre_heart" },
+            unlockedPowerIds = unlockedPowers,
+            powerMasteryMap = masteryMap
         )
     }
 
@@ -1230,6 +1563,11 @@ class SoulRepository(private val soulDao: SoulDao) {
         val unlockedArr = JSONArray(unlockedEffectIds).toString()
         val claimedArr = JSONArray(claimedAchievementIds).toString()
         val unlockedArchArr = JSONArray(unlockedArchetypeIds).toString()
+        val unlockedArtArr = JSONArray(unlockedArtifactIds).toString()
+        val unlockedPowersArr = JSONArray(unlockedPowerIds).toString()
+        val masteryObj = JSONObject().apply {
+            powerMasteryMap.forEach { (k, v) -> put(k, v) }
+        }.toString()
 
         return SoulProfileEntity(
             id = 1,
@@ -1259,7 +1597,23 @@ class SoulRepository(private val soulDao: SoulDao) {
             unlockedArchetypesJson = unlockedArchArr,
             equippedEffectId = equippedEffectId,
             unlockedEffectsJson = unlockedArr,
-            claimedAchievementsJson = claimedArr
+            claimedAchievementsJson = claimedArr,
+            currentQi = currentQi,
+            maxQi = maxQi,
+            cultivationRealm = cultivationRealm,
+            cultivationStage = cultivationStage,
+            spiritualRoots = spiritualRoots,
+            equippedArtifactId = equippedArtifactId,
+            unlockedArtifactsJson = unlockedArtArr,
+            activeTribulationTalismanCount = activeTribulationTalismanCount,
+            primaryElement = primaryElement,
+            equippedAttackId = equippedAttackId,
+            equippedManipulationId = equippedManipulationId,
+            equippedSupportId = equippedSupportId,
+            equippedHealingId = equippedHealingId,
+            equippedTraitId = equippedTraitId,
+            unlockedPowersJson = unlockedPowersArr,
+            powerMasteryJson = masteryObj
         )
     }
 }

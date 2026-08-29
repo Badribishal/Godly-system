@@ -152,8 +152,7 @@ fun LevelUpCelebrationDialog(
                             style = MaterialTheme.typography.titleLarge,
                             color = RadiantGold,
                             fontWeight = FontWeight.ExtraBold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.2.sp,
+                            letterSpacing = 0.5.sp,
                             textAlign = TextAlign.Center
                         )
 

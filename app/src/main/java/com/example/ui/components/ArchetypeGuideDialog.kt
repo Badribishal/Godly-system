@@ -104,8 +104,7 @@ fun ArchetypeGuideDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = RadiantGoldBright,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "Seven Deadly Sins & Seven Heavenly Virtues",
@@ -222,8 +221,7 @@ private fun ShadowTraitCard(sin: ShadowType) {
                 Text(
                     text = "« ${sin.title} »",
                     fontSize = 11.sp,
-                    color = TextAmethyst,
-                    fontFamily = FontFamily.Serif
+                    color = TextAmethyst
                 )
             }
 
@@ -320,8 +318,7 @@ private fun VirtueTraitCard(virtue: VirtueType) {
                 Text(
                     text = "« ${virtue.title} »",
                     fontSize = 11.sp,
-                    color = TextGold,
-                    fontFamily = FontFamily.Serif
+                    color = TextGold
                 )
             }
 

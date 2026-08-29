@@ -275,7 +275,6 @@ fun QuestReflectionDialog(
                             text = quest.prompt,
                             style = MaterialTheme.typography.bodyMedium,
                             color = TextPrimary,
-                            fontFamily = FontFamily.Serif,
                             lineHeight = 21.sp
                         )
                     }

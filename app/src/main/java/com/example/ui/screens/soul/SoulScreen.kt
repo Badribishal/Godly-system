@@ -79,6 +79,9 @@ fun SoulScreen(
     onOpenWardrobe: () -> Unit = {},
     onOpenHistory: () -> Unit = {},
     onOpenArchetypes: () -> Unit = {},
+    onOpenQiChamber: () -> Unit = {},
+    onOpenTreasury: () -> Unit = {},
+    onOpenElementalPowers: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Shadows, 1: Virtues, 2: Evolution Matrix
@@ -120,8 +123,7 @@ fun SoulScreen(
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.sp
+                            letterSpacing = 0.5.sp
                         )
                         Text(
                             text = "The Astral Blueprint of the Vessel",
@@ -131,21 +133,21 @@ fun SoulScreen(
                     }
                 }
 
-                // Shards & Wardrobe Button
+                // Shards & Treasury Button
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(1.dp, EtherealCyan.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                        .clickable { onOpenWardrobe() }
+                        .border(1.dp, RadiantGold.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                        .clickable { onOpenTreasury() }
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(text = "💎 ${soul.soulShards}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = EtherealCyan)
-                        Text(text = "Wardrobe", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "💎 ${soul.soulShards}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = RadiantGoldBright)
+                        Text(text = "Treasury", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -155,7 +157,10 @@ fun SoulScreen(
         item {
             IdentityHeader(
                 soul = soul,
-                onOpenArchetypes = onOpenArchetypes
+                onOpenArchetypes = onOpenArchetypes,
+                onOpenQiChamber = onOpenQiChamber,
+                onOpenTreasury = onOpenTreasury,
+                onOpenElementalPowers = onOpenElementalPowers
             )
         }
 

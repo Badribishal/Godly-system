@@ -111,7 +111,6 @@ fun AwakeningDialog(
                     style = MaterialTheme.typography.headlineMedium,
                     color = RadiantGoldBright,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif,
                     textAlign = TextAlign.Center
                 )
 
@@ -184,7 +183,6 @@ fun AwakeningDialog(
                         text = "« ${result.systemOmen} »",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextAmethyst,
-                        fontFamily = FontFamily.Serif,
                         textAlign = TextAlign.Center
                     )
                 }

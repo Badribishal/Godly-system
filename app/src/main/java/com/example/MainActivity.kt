@@ -59,12 +59,17 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AchievementsDialog
 import com.example.ui.components.ArchetypeGalleryDialog
 import com.example.ui.components.AwakeningDialog
+import com.example.ui.components.BreakthroughCelebrationDialog
+import com.example.ui.components.CauldronRefineDialog
 import com.example.ui.components.CosmicParticlesCanvas
+import com.example.ui.components.ElementalPowersDialog
 import com.example.ui.components.LevelUpCelebrationDialog
+import com.example.ui.components.QiChamberDialog
 import com.example.ui.components.QuestReflectionDialog
 import com.example.ui.components.SanctuaryLibraryDialog
 import com.example.ui.components.SettingsDialog
 import com.example.ui.components.SoulRecordDialog
+import com.example.ui.components.SpiritTreasuryDialog
 import com.example.ui.components.WardrobeDialog
 import com.example.ui.screens.main.MainScreen
 import com.example.ui.screens.record.RecordScreen
@@ -122,6 +127,15 @@ fun GodlySystemApp(
     val levelUpOutcome by viewModel.levelUpOutcome.collectAsStateWithLifecycle()
     val dailyQuestsState by viewModel.dailyQuestsState.collectAsStateWithLifecycle()
     val selectedQuestForReflection by viewModel.selectedQuestForReflection.collectAsStateWithLifecycle()
+    val showQiChamberDialog by viewModel.showQiChamberDialog.collectAsStateWithLifecycle()
+    val showSpiritTreasuryDialog by viewModel.showSpiritTreasuryDialog.collectAsStateWithLifecycle()
+    val showElementalPowersDialog by viewModel.showElementalPowersDialog.collectAsStateWithLifecycle()
+    val selectedElementFilter by viewModel.selectedElementFilter.collectAsStateWithLifecycle()
+    val selectedPowerCategoryFilter by viewModel.selectedPowerCategoryFilter.collectAsStateWithLifecycle()
+    val breakthroughResult by viewModel.breakthroughResult.collectAsStateWithLifecycle()
+    val showBreakthroughDialog by viewModel.showBreakthroughDialog.collectAsStateWithLifecycle()
+    val cauldronResult by viewModel.cauldronResult.collectAsStateWithLifecycle()
+    val showCauldronDialog by viewModel.showCauldronDialog.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val rarePalette by viewModel.rarePalette.collectAsStateWithLifecycle()
     val achievements by viewModel.achievements.collectAsStateWithLifecycle()
@@ -255,7 +269,10 @@ fun GodlySystemApp(
                             onOpenSettings = { viewModel.openSettings() },
                             onOpenAchievements = { viewModel.openAchievements() },
                             onOpenWardrobe = { viewModel.openWardrobe() },
-                            onOpenArchetypes = { viewModel.openArchetypesDialog() }
+                            onOpenArchetypes = { viewModel.openArchetypesDialog() },
+                            onOpenQiChamber = { viewModel.openQiChamber(true) },
+                            onOpenTreasury = { viewModel.openSpiritTreasury(true) },
+                            onOpenElementalPowers = { viewModel.openElementalPowers(true) }
                         )
 
                         ScreenTab.RECORD -> RecordScreen(
@@ -286,7 +303,10 @@ fun GodlySystemApp(
                                 }
                             },
                             onOpenWardrobe = { viewModel.openWardrobe() },
-                            onOpenArchetypes = { viewModel.openArchetypesDialog() }
+                            onOpenArchetypes = { viewModel.openArchetypesDialog() },
+                            onOpenQiChamber = { viewModel.openQiChamber(true) },
+                            onOpenTreasury = { viewModel.openSpiritTreasury(true) },
+                            onOpenElementalPowers = { viewModel.openElementalPowers(true) }
                         )
                     }
                 }
@@ -398,6 +418,63 @@ fun GodlySystemApp(
                 onDismiss = { viewModel.dismissAwakeningModal() }
             )
         }
+
+        // Qi Chamber Dialog (Cultivation, Meditation, Breakthrough)
+        if (showQiChamberDialog) {
+            QiChamberDialog(
+                soul = soulProfile,
+                onDismiss = { viewModel.openQiChamber(false) },
+                onGatherQi = { viewModel.gatherQi(it) },
+                onBreakthrough = { viewModel.performBreakthrough() },
+                onOpenTreasury = {
+                    viewModel.openQiChamber(false)
+                    viewModel.openSpiritTreasury(true)
+                }
+            )
+        }
+
+        // Spirit Treasury Dialog (Gems Shop, Artifact Relics, Cauldron Alchemy)
+        if (showSpiritTreasuryDialog) {
+            SpiritTreasuryDialog(
+                soul = soulProfile,
+                onDismiss = { viewModel.openSpiritTreasury(false) },
+                onPurchaseItem = { viewModel.purchaseSpiritItem(it) },
+                onEquipArtifact = { viewModel.equipArtifact(it) },
+                onRefineCauldron = { viewModel.refineInCauldron(it) }
+            )
+        }
+
+        // Elemental Powers & Arts Dialog (14 Elements, 50+ Powers/Traits/Attacks/Manipulations/Support/Healing)
+        if (showElementalPowersDialog) {
+            ElementalPowersDialog(
+                soul = soulProfile,
+                selectedElementFilter = selectedElementFilter,
+                selectedCategoryFilter = selectedPowerCategoryFilter,
+                onDismiss = { viewModel.openElementalPowers(false) },
+                onSelectElementFilter = { viewModel.setElementFilter(it) },
+                onSelectCategoryFilter = { viewModel.setPowerCategoryFilter(it) },
+                onEquipPower = { powerId, category -> viewModel.equipElementalPower(powerId, category) },
+                onSetPrimaryElement = { elemName -> viewModel.setPrimaryElement(elemName) },
+                onTrainMastery = { powerId, qiCost -> viewModel.trainPowerMastery(powerId, qiCost) },
+                onChannelArt = { powerId -> viewModel.channelPowerArt(powerId) }
+            )
+        }
+
+        // Breakthrough Celebration Dialog
+        if (showBreakthroughDialog && breakthroughResult != null) {
+            BreakthroughCelebrationDialog(
+                result = breakthroughResult!!,
+                onDismiss = { viewModel.dismissBreakthroughDialog() }
+            )
+        }
+
+        // Cauldron Refinement Celebration Dialog
+        if (showCauldronDialog && cauldronResult != null) {
+            CauldronRefineDialog(
+                result = cauldronResult!!,
+                onDismiss = { viewModel.dismissCauldronDialog() }
+            )
+        }
     }
 }
 
@@ -410,29 +487,35 @@ fun PillowBottomNavigationBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
             .windowInsetsPadding(WindowInsets.navigationBars),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .height(60.dp)
-                .clip(RoundedCornerShape(30.dp))
+                .fillMaxWidth()
+                .height(62.dp)
+                .clip(RoundedCornerShape(32.dp))
                 .border(
                     width = 1.2.dp,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                    shape = RoundedCornerShape(30.dp)
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f),
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(32.dp)
                 )
                 .testTag("pillow_bottom_nav"),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-            shadowElevation = 14.dp,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+            shadowElevation = 16.dp,
             tonalElevation = 6.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = 6.dp, vertical = 5.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -472,20 +555,36 @@ private fun PillowNavItem(
     onClick: () -> Unit,
     testTag: String
 ) {
+    val animatedAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1f else 0.7f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "nav_alpha"
+    )
+    val animatedScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (selected) 1.04f else 0.98f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.75f, stiffness = 400f),
+        label = "nav_scale"
+    )
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(22.dp))
+            .graphicsLayer {
+                scaleX = animatedScale
+                scaleY = animatedScale
+                alpha = animatedAlpha
+            }
+            .clip(RoundedCornerShape(24.dp))
             .background(
-                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.24f)
                 else Color.Transparent
             )
             .border(
-                width = if (selected) 1.dp else 0.dp,
-                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Transparent,
-                shape = RoundedCornerShape(22.dp)
+                width = if (selected) 1.2.dp else 0.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.75f) else Color.Transparent,
+                shape = RoundedCornerShape(24.dp)
             )
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = 14.dp, vertical = 9.dp)
             .testTag(testTag),
         contentAlignment = Alignment.Center
     ) {
@@ -497,12 +596,12 @@ private fun PillowNavItem(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(19.dp)
             )
             Text(
                 text = label,
                 fontSize = 12.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
                 color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )

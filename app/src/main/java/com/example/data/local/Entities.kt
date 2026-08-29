@@ -53,6 +53,22 @@ data class SoulProfileEntity(
     val equippedEffectId: String = "effect_default",
     val unlockedEffectsJson: String = "[\"effect_default\"]",
     val claimedAchievementsJson: String = "[]",
+    val currentQi: Int = 120,
+    val maxQi: Int = 300,
+    val cultivationRealm: String = "Qi Condensation",
+    val cultivationStage: Int = 1,
+    val spiritualRoots: String = "Five Elements Balanced Root",
+    val equippedArtifactId: String = "artifact_none",
+    val unlockedArtifactsJson: String = "[]",
+    val activeTribulationTalismanCount: Int = 0,
+    val primaryElement: String = "Fire",
+    val equippedAttackId: String = "atk_fire_sunflare",
+    val equippedManipulationId: String = "man_fire_pyrokinesis",
+    val equippedSupportId: String = "sup_fire_blaze_mantle",
+    val equippedHealingId: String = "heal_fire_phoenix_rebirth",
+    val equippedTraitId: String = "trait_fire_pyre_heart",
+    val unlockedPowersJson: String = "[]",
+    val powerMasteryJson: String = "{}",
     val lastUpdated: Long = System.currentTimeMillis()
 )
 

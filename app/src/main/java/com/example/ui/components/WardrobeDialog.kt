@@ -124,8 +124,7 @@ fun WardrobeDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                fontFamily = FontFamily.Serif,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "Cosmetic Visual Auras & Avatar Effects",

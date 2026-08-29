@@ -169,8 +169,7 @@ fun SanctuaryLibraryCard(
                             style = MaterialTheme.typography.titleMedium,
                             color = RadiantGoldBright,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.sp
+                            letterSpacing = 0.5.sp
                         )
                         Text(
                             text = "Historical Logs • ${events.size} Chronicles",
@@ -246,8 +245,7 @@ fun SanctuaryLibraryCard(
                         Text(
                             text = "« ${soul.currentTitle} »",
                             fontSize = 11.5.sp,
-                            color = EtherealCyan,
-                            fontFamily = FontFamily.Serif
+                            color = EtherealCyan
                         )
                     }
 
@@ -528,8 +526,7 @@ fun TimelineLogItem(
                 text = event.title,
                 style = MaterialTheme.typography.titleSmall,
                 color = TextPrimary,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Serif
+                fontWeight = FontWeight.Bold
             )
 
             Text(
@@ -656,8 +653,7 @@ fun SanctuaryLibraryDialog(
                                 text = "SANCTUARY CODEX",
                                 style = MaterialTheme.typography.titleLarge,
                                 color = RadiantGoldBright,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
+                                fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "Chronicle of Godly Evolutions & Epochs",
@@ -855,8 +851,7 @@ fun ArchiveEvolutionDialog(
                             text = "ARCHIVE GODLY IDENTITY",
                             style = MaterialTheme.typography.titleMedium,
                             color = RadiantGoldBright,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Preserve current vessel state into Sanctuary Library",

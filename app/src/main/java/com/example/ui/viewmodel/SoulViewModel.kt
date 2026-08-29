@@ -96,6 +96,35 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
     private val _showArchetypesDialog = MutableStateFlow(false)
     val showArchetypesDialog: StateFlow<Boolean> = _showArchetypesDialog.asStateFlow()
 
+    // Qi Cultivation & Spirit Treasury Dialog States
+    private val _showQiChamberDialog = MutableStateFlow(false)
+    val showQiChamberDialog: StateFlow<Boolean> = _showQiChamberDialog.asStateFlow()
+
+    private val _showSpiritTreasuryDialog = MutableStateFlow(false)
+    val showSpiritTreasuryDialog: StateFlow<Boolean> = _showSpiritTreasuryDialog.asStateFlow()
+
+    private val _breakthroughResult = MutableStateFlow<com.example.data.engine.BreakthroughResult?>(null)
+    val breakthroughResult: StateFlow<com.example.data.engine.BreakthroughResult?> = _breakthroughResult.asStateFlow()
+
+    private val _showBreakthroughDialog = MutableStateFlow(false)
+    val showBreakthroughDialog: StateFlow<Boolean> = _showBreakthroughDialog.asStateFlow()
+
+    private val _cauldronResult = MutableStateFlow<com.example.data.engine.CauldronRefineResult?>(null)
+    val cauldronResult: StateFlow<com.example.data.engine.CauldronRefineResult?> = _cauldronResult.asStateFlow()
+
+    private val _showCauldronDialog = MutableStateFlow(false)
+    val showCauldronDialog: StateFlow<Boolean> = _showCauldronDialog.asStateFlow()
+
+    // Elemental Powers & Arts Dialog States
+    private val _showElementalPowersDialog = MutableStateFlow(false)
+    val showElementalPowersDialog: StateFlow<Boolean> = _showElementalPowersDialog.asStateFlow()
+
+    private val _selectedElementFilter = MutableStateFlow<com.example.data.model.ElementType?>(null)
+    val selectedElementFilter: StateFlow<com.example.data.model.ElementType?> = _selectedElementFilter.asStateFlow()
+
+    private val _selectedPowerCategoryFilter = MutableStateFlow<com.example.data.model.PowerCategory?>(null)
+    val selectedPowerCategoryFilter: StateFlow<com.example.data.model.PowerCategory?> = _selectedPowerCategoryFilter.asStateFlow()
+
     private val _selectedQuestForReflection = MutableStateFlow<com.example.data.model.DailyQuest?>(null)
     val selectedQuestForReflection: StateFlow<com.example.data.model.DailyQuest?> = _selectedQuestForReflection.asStateFlow()
 
@@ -748,5 +777,144 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
         )
         _recordFormState.value = newState
         persistDraft(newState)
+    }
+
+    // === QI CULTIVATION & SPIRIT TREASURY CONTROLLER METHODS ===
+
+    fun openQiChamber(show: Boolean = true) {
+        _showQiChamberDialog.value = show
+    }
+
+    fun openSpiritTreasury(show: Boolean = true) {
+        _showSpiritTreasuryDialog.value = show
+    }
+
+    fun openArchetypesDialog(show: Boolean = true) {
+        _showArchetypesDialog.value = show
+    }
+
+    fun openWardrobeDialog(show: Boolean = true) {
+        _showWardrobeDialog.value = show
+    }
+
+    fun gatherQi(amount: Int = 20) {
+        viewModelScope.launch {
+            repository.gatherQi(amount)
+        }
+    }
+
+    fun performBreakthrough() {
+        viewModelScope.launch {
+            val result = repository.performBreakthrough()
+            _breakthroughResult.value = result
+            _showBreakthroughDialog.value = true
+            refreshAchievements()
+        }
+    }
+
+    fun dismissBreakthroughDialog() {
+        _showBreakthroughDialog.value = false
+    }
+
+    fun purchaseSpiritItem(itemId: String) {
+        viewModelScope.launch {
+            val result = repository.purchaseSpiritItem(itemId)
+            result.onSuccess { (_, feedback) ->
+                _systemToast.value = feedback
+                refreshAchievements()
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Failed to acquire spiritual item."
+            }
+        }
+    }
+
+    fun refineInCauldron(gemCost: Int = 50) {
+        viewModelScope.launch {
+            val result = repository.refineInCauldron(gemCost)
+            result.onSuccess { refineResult ->
+                _cauldronResult.value = refineResult
+                _showCauldronDialog.value = true
+                refreshAchievements()
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Alchemical refinement failed."
+            }
+        }
+    }
+
+    fun dismissCauldronDialog() {
+        _showCauldronDialog.value = false
+    }
+
+    fun equipArtifact(artifactId: String) {
+        viewModelScope.launch {
+            val result = repository.equipArtifact(artifactId)
+            result.onSuccess {
+                val item = com.example.data.model.SpiritTreasuryCatalog.getItemById(artifactId)
+                _systemToast.value = if (item != null) "Equipped Artifact: [${item.name}]" else "Unequipped Artifact"
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Failed to equip artifact."
+            }
+        }
+    }
+
+    // === ELEMENTAL POWERS CONTROLLER METHODS ===
+
+    fun openElementalPowers(show: Boolean = true) {
+        _showElementalPowersDialog.value = show
+    }
+
+    fun setElementFilter(element: com.example.data.model.ElementType?) {
+        _selectedElementFilter.value = element
+    }
+
+    fun setPowerCategoryFilter(category: com.example.data.model.PowerCategory?) {
+        _selectedPowerCategoryFilter.value = category
+    }
+
+    fun equipElementalPower(powerId: String, category: com.example.data.model.PowerCategory) {
+        viewModelScope.launch {
+            val result = repository.equipElementalPower(powerId, category)
+            result.onSuccess {
+                val power = com.example.data.model.ElementalPowersCatalog.getPowerById(powerId)
+                _systemToast.value = "Equipped ${power?.name ?: "Art"} as ${category.displayName}!"
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Failed to equip power."
+            }
+        }
+    }
+
+    fun setPrimaryElement(elementName: String) {
+        viewModelScope.launch {
+            val result = repository.setPrimaryElement(elementName)
+            result.onSuccess {
+                _systemToast.value = "Attuned Vessel Primary Element to $elementName!"
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Failed to set primary element."
+            }
+        }
+    }
+
+    fun trainPowerMastery(powerId: String, qiCost: Int = 50) {
+        viewModelScope.launch {
+            val result = repository.trainPowerMastery(powerId, qiCost)
+            result.onSuccess { (_, newTier) ->
+                val power = com.example.data.model.ElementalPowersCatalog.getPowerById(powerId)
+                _systemToast.value = "✨ Ascended [${power?.name}] to Mastery Tier $newTier/5! +💎 15 Shards"
+                refreshAchievements()
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Mastery training failed."
+            }
+        }
+    }
+
+    fun channelPowerArt(powerId: String) {
+        viewModelScope.launch {
+            val result = repository.channelPowerArt(powerId)
+            result.onSuccess { (_, feedback) ->
+                _systemToast.value = feedback
+            }.onFailure { error ->
+                _systemToast.value = error.message ?: "Failed to channel elemental art."
+            }
+        }
     }
 }

@@ -236,8 +236,7 @@ fun RecordScreen(
                             style = MaterialTheme.typography.titleLarge,
                             color = RadiantGoldBright,
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif,
-                            letterSpacing = 1.4.sp
+                            letterSpacing = 0.5.sp
                         )
                         Text(
                             text = "Select positive & negative emotions or primal forces to calibrate your identity",

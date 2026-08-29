@@ -191,8 +191,7 @@ fun ArchetypeGalleryDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = RadiantGoldBright,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif,
-                                letterSpacing = 1.2.sp
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "Classes & Celestial Heritages Codex",
@@ -349,8 +348,7 @@ fun ArchetypeGalleryDialog(
                         Text(
                             text = "No archetypes match the active filter criteria.",
                             color = TextMuted,
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Serif
+                            fontSize = 12.sp
                         )
                     }
                 } else {
@@ -590,7 +588,6 @@ private fun ArchetypeGalleryCard(
                 text = "« ${archetype.lore} »",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (isUnlocked) TextPrimary.copy(alpha = 0.85f) else TextMuted.copy(alpha = 0.7f),
-                fontFamily = FontFamily.Serif,
                 lineHeight = 17.sp
             )
 

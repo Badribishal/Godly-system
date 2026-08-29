@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flare
 import androidx.compose.material.icons.filled.SelfImprovement
@@ -33,12 +34,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -94,6 +99,9 @@ fun MainScreen(
     onOpenAchievements: () -> Unit = {},
     onOpenWardrobe: () -> Unit = {},
     onOpenArchetypes: () -> Unit = {},
+    onOpenQiChamber: () -> Unit = {},
+    onOpenTreasury: () -> Unit = {},
+    onOpenElementalPowers: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val expTimelineStats = remember(soul, records, events) {
@@ -124,8 +132,7 @@ fun MainScreen(
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 0.5.sp
                     )
                     Text(
                         text = "Arcane Personality Evaluation",
@@ -142,16 +149,16 @@ fun MainScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Soul Shards Pill (Clickable -> Wardrobe)
+                    // Soul Shards Pill (Clickable -> Treasury Shop)
                     Surface(
                         modifier = Modifier
                             .height(38.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .clickable(onClick = onOpenWardrobe)
+                            .clickable(onClick = onOpenTreasury)
                             .testTag("top_bar_shards_chip"),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, EtherealCyan.copy(alpha = 0.45f))
+                        border = BorderStroke(1.dp, RadiantGold.copy(alpha = 0.5f))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -166,7 +173,7 @@ fun MainScreen(
                                 text = "${soul.soulShards}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = EtherealCyan
+                                color = RadiantGoldBright
                             )
                         }
                     }
@@ -247,7 +254,10 @@ fun MainScreen(
             IdentityHeader(
                 soul = soul,
                 resonance = resonance,
-                onOpenArchetypes = onOpenArchetypes
+                onOpenArchetypes = onOpenArchetypes,
+                onOpenQiChamber = onOpenQiChamber,
+                onOpenTreasury = onOpenTreasury,
+                onOpenElementalPowers = onOpenElementalPowers
             )
         }
 
@@ -299,30 +309,39 @@ fun MainScreen(
                         )
 
                         SanctuaryIconButton(
-                            label = "Soul Matrix",
+                            label = "Qi Chamber",
                             icon = Icons.Default.SelfImprovement,
-                            glowColor = RadiantGold,
-                            onClick = { onNavigate(ScreenTab.SOUL) },
+                            glowColor = EtherealCyan,
+                            onClick = onOpenQiChamber,
                             modifier = Modifier.weight(1f),
-                            testTag = "portal_soul_button"
+                            testTag = "portal_qi_chamber_button"
+                        )
+
+                        SanctuaryIconButton(
+                            label = "Powers",
+                            icon = Icons.Default.Bolt,
+                            glowColor = Color(0xFFF59E0B),
+                            onClick = onOpenElementalPowers,
+                            modifier = Modifier.weight(1f),
+                            testTag = "portal_powers_button"
+                        )
+
+                        SanctuaryIconButton(
+                            label = "Treasury",
+                            icon = Icons.Default.AutoAwesome,
+                            glowColor = RadiantGold,
+                            onClick = onOpenTreasury,
+                            modifier = Modifier.weight(1f),
+                            testTag = "portal_treasury_button"
                         )
 
                         SanctuaryIconButton(
                             label = "Library",
                             icon = Icons.Default.AutoStories,
-                            glowColor = EtherealCyan,
+                            glowColor = CelestialAmethystLight,
                             onClick = onOpenLibrary,
                             modifier = Modifier.weight(1f),
                             testTag = "portal_library_button"
-                        )
-
-                        SanctuaryIconButton(
-                            label = "Wardrobe",
-                            icon = Icons.Default.AutoAwesome,
-                            glowColor = CelestialAmethystLight,
-                            onClick = onOpenWardrobe,
-                            modifier = Modifier.weight(1f),
-                            testTag = "portal_wardrobe_button"
                         )
                     }
                 }
@@ -415,8 +434,7 @@ fun MainScreen(
                         Text(
                             text = "« ${soul.systemMessage} »",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = TextPrimary,
-                            fontFamily = FontFamily.Serif
+                            color = TextPrimary
                         )
                     }
                 }
@@ -435,7 +453,6 @@ fun MainScreen(
                     text = "« The System evaluates patterns, not moral worth. Every choice leaves an astral imprint. »",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
-                    fontFamily = FontFamily.Serif,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
@@ -452,21 +469,52 @@ private fun SanctuaryIconButton(
     testTag: String,
     modifier: Modifier = Modifier
 ) {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) 0.93f else 1.0f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 500f),
+        label = "button_scale"
+    )
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 6.dp)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = androidx.compose.material3.ripple(bounded = true, color = glowColor),
+                onClick = onClick
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp)
             .testTag(testTag)
     ) {
         Box(
             modifier = Modifier
                 .size(50.dp)
                 .clip(CircleShape)
-                .background(glowColor.copy(alpha = 0.15f))
-                .border(1.2.dp, glowColor.copy(alpha = 0.55f), CircleShape),
+                .background(
+                    androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = 0.28f),
+                            glowColor.copy(alpha = 0.08f)
+                        )
+                    )
+                )
+                .border(
+                    width = 1.3.dp,
+                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                        colors = listOf(
+                            glowColor.copy(alpha = 0.8f),
+                            glowColor.copy(alpha = 0.3f)
+                        )
+                    ),
+                    shape = CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -481,9 +529,11 @@ private fun SanctuaryIconButton(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = TextPrimary,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Bold,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-            fontSize = 11.5.sp
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }

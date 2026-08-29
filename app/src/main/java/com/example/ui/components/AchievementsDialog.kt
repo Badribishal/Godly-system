@@ -170,8 +170,7 @@ fun AchievementsDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = RadiantGoldBright,
-                                fontFamily = FontFamily.Serif,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "$unlockedCount of ${achievements.size} Milestones Conquered",
@@ -651,8 +650,7 @@ fun AchievementCard(
                     Text(
                         text = "${achievement.currentProgress}/${achievement.targetProgress}",
                         fontSize = 9.sp,
-                        color = TextMuted,
-                        fontFamily = FontFamily.Monospace
+                        color = TextMuted
                     )
                 }
             }

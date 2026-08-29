@@ -81,9 +81,17 @@ fun IdentityHeader(
     soul: SoulIdentity,
     resonance: SoulResonanceData? = null,
     onOpenArchetypes: (() -> Unit)? = null,
+    onOpenQiChamber: (() -> Unit)? = null,
+    onOpenTreasury: (() -> Unit)? = null,
+    onOpenElementalPowers: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showMilestonesDialog by remember { mutableStateOf(false) }
+    val realm = remember(soul.cultivationRealm) { com.example.data.model.CultivationRealm.fromNameOrId(soul.cultivationRealm) }
+    val qiRatio = (soul.currentQi.toFloat() / soul.maxQi.toFloat()).coerceIn(0f, 1f)
+    val equippedArtifact = remember(soul.equippedArtifactId) {
+        com.example.data.model.SpiritTreasuryCatalog.getItemById(soul.equippedArtifactId)
+    }
     val badges = remember(soul.race, soul.className, soul.soulShards, soul.evolutionProgress, soul.dominantVirtue, soul.dominantShadow) {
         IdentityMilestoneCatalog.evaluateMilestones(soul, emptyList(), emptyList())
     }
@@ -248,7 +256,6 @@ fun IdentityHeader(
                     text = "« ${soul.currentTitle} »",
                     style = MaterialTheme.typography.titleMedium,
                     color = RadiantGoldBright,
-                    fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     letterSpacing = 0.5.sp
@@ -380,6 +387,194 @@ fun IdentityHeader(
                 }
             }
 
+            // QI CULTIVATION & SPIRIT TREASURY STATUS CARD
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(
+                        1.2.dp,
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color(realm.colorHex).copy(alpha = 0.85f),
+                                RadiantGold.copy(alpha = 0.6f),
+                                EtherealCyan.copy(alpha = 0.5f)
+                            )
+                        ),
+                        RoundedCornerShape(18.dp)
+                    )
+                    .testTag("qi_cultivation_header_card"),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0A0D1A)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Header Row: Realm, Stage & Gem Counter
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                color = Color(realm.colorHex).copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex))
+                            ) {
+                                Text(
+                                    text = "${realm.runeSymbol} ${realm.displayName}",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(realm.colorHex),
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "${realm.displayName} • Stage ${soul.cultivationStage}/${realm.maxStages}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "${soul.currentQi} / ${soul.maxQi} Qi (${(qiRatio * 100).toInt()}%)",
+                                    fontSize = 10.sp,
+                                    color = if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Gem Counter Chip with Treasury Link
+                        Surface(
+                            modifier = Modifier.clickable(enabled = onOpenTreasury != null) { onOpenTreasury?.invoke() },
+                            color = RadiantGold.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text("💎", fontSize = 12.sp)
+                                Text(
+                                    text = "${soul.soulShards}",
+                                    color = RadiantGoldBright,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                                Text("Shop ›", fontSize = 10.sp, color = TextGold)
+                            }
+                        }
+                    }
+
+                    // Linear Qi Reservoir Progress Bar
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF1B2236))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(qiRatio.coerceIn(0.02f, 1f))
+                                .fillMaxHeight()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            Color(realm.colorHex),
+                                            if (soul.currentQi >= soul.maxQi) RadiantGoldBright else EtherealCyan
+                                        )
+                                    )
+                                )
+                        )
+                    }
+
+                    // Footer Row: Equipped Relic / Spiritual Root & Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (equippedArtifact != null) {
+                                Text(text = equippedArtifact.iconEmoji, fontSize = 12.sp)
+                                Text(
+                                    text = "[${equippedArtifact.name}] equipped",
+                                    fontSize = 10.5.sp,
+                                    color = Color(equippedArtifact.colorHex),
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            } else {
+                                Text(
+                                    text = "Root: ${soul.spiritualRoots}",
+                                    fontSize = 10.5.sp,
+                                    color = TextMuted,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (onOpenQiChamber != null) {
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { onOpenQiChamber() }
+                                        .testTag("open_qi_chamber_header_btn"),
+                                    color = Color(realm.colorHex).copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(realm.colorHex).copy(alpha = 0.6f))
+                                ) {
+                                    Text(
+                                        text = "⚡ Qi Chamber",
+                                        color = Color(realm.colorHex),
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+
+                            if (onOpenTreasury != null) {
+                                Surface(
+                                    modifier = Modifier
+                                        .clickable { onOpenTreasury() }
+                                        .testTag("open_treasury_header_btn"),
+                                    color = RadiantGold.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, RadiantGold.copy(alpha = 0.6f))
+                                ) {
+                                    Text(
+                                        text = "🏛️ Treasury",
+                                        color = RadiantGoldBright,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Main Vessel Showcase: Avatar Crest, Race, Class & Element
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -395,7 +590,6 @@ fun IdentityHeader(
                         style = MaterialTheme.typography.headlineMedium,
                         color = Color.White,
                         fontWeight = FontWeight.ExtraBold,
-                        fontFamily = FontFamily.Serif,
                         letterSpacing = 0.5.sp
                     )
                     Text(
@@ -417,31 +611,55 @@ fun IdentityHeader(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(Color(0xFF0F172A).copy(alpha = 0.8f))
                                 .border(0.6.dp, archTheme.primary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                                .clickable(enabled = onOpenElementalPowers != null) { onOpenElementalPowers?.invoke() }
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                                .testTag("header_affinity_chip"),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(text = "Affinity:", fontSize = 10.sp, color = TextMuted)
                             Text(
-                                text = soul.element,
+                                text = soul.primaryElement.ifBlank { soul.element },
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = archTheme.primary
                             )
+                            if (onOpenElementalPowers != null) {
+                                Text("⚡", fontSize = 10.sp)
+                            }
                         }
 
-                        Surface(
-                            color = archTheme.primary.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(0.6.dp, archTheme.primary.copy(alpha = 0.35f))
-                        ) {
-                            Text(
-                                text = if (archTheme.isWarm) "🔥 Warm Palette" else if (archTheme.isCoolEthereal) "✨ Cool Ethereal" else "🌿 Primordial",
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = archTheme.primary,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            )
+                        if (onOpenElementalPowers != null) {
+                            Surface(
+                                modifier = Modifier
+                                    .clickable { onOpenElementalPowers() }
+                                    .testTag("header_elemental_powers_btn"),
+                                color = archTheme.primary.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(0.8.dp, archTheme.primary.copy(alpha = 0.6f))
+                            ) {
+                                Text(
+                                    text = "🔥 Powers & Arts ›",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = archTheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
+                        } else {
+                            Surface(
+                                color = archTheme.primary.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(0.6.dp, archTheme.primary.copy(alpha = 0.35f))
+                            ) {
+                                Text(
+                                    text = if (archTheme.isWarm) "🔥 Warm Palette" else if (archTheme.isCoolEthereal) "✨ Cool Ethereal" else "🌿 Primordial",
+                                    fontSize = 9.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = archTheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -898,8 +1116,7 @@ fun IdentityHeader(
                                     text = "IDENTITY MILESTONES",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = RadiantGoldBright,
-                                    fontFamily = FontFamily.Serif
+                                    color = RadiantGoldBright
                                 )
                                 Text(
                                     text = "$unlockedCount of ${badges.size} Astral Badges Unlocked",

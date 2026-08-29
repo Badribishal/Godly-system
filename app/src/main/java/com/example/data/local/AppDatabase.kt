@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         DailyEmotionRecordEntity::class,
         TrackedEmotionEntity::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

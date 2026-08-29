@@ -106,8 +106,7 @@ fun ReflectionScreen(
                         text = "DIVINE REFLECTION",
                         style = MaterialTheme.typography.headlineMedium,
                         color = RadiantGoldBright,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Contemplative Inquiries & Astral Dilemmas",

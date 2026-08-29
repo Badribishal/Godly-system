@@ -157,8 +157,7 @@ fun ArchetypeMatrixDialog(
                                 style = MaterialTheme.typography.titleMedium,
                                 color = RadiantGold,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                fontFamily = FontFamily.Serif
+                                letterSpacing = 0.5.sp
                             )
                             Text(
                                 text = "Level Up to Unlock Advanced Transmutations",
@@ -494,8 +493,7 @@ private fun ArchetypeCard(
             Text(
                 text = "« ${archetype.lore} »",
                 fontSize = 11.sp,
-                color = if (isUnlocked) TextPrimary.copy(alpha = 0.85f) else TextMuted,
-                fontFamily = FontFamily.Serif
+                color = if (isUnlocked) TextPrimary.copy(alpha = 0.85f) else TextMuted
             )
 
             // Passive Perk Box

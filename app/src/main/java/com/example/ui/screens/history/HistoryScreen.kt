@@ -149,8 +149,7 @@ fun HistoryScreen(
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif,
-                        letterSpacing = 1.5.sp
+                        letterSpacing = 0.5.sp
                     )
                     Text(
                         text = "Chronicle of Persona Evolutions & Identity Shifts",
@@ -315,7 +314,6 @@ fun HistoryScreen(
                     text = "« Every recorded thought shifts the equilibrium of the soul. »",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextMuted,
-                    fontFamily = FontFamily.Serif,
                     fontSize = 11.sp
                 )
             }
@@ -708,8 +706,7 @@ private fun DailyInputHistoryCard(
                         Text(
                             text = "Reflection: « ${record.reflection} »",
                             fontSize = 11.sp,
-                            color = EtherealCyan,
-                            fontFamily = FontFamily.Serif
+                            color = EtherealCyan
                         )
                     }
 
@@ -748,8 +745,7 @@ private fun EmptyHistoryCard(message: String) {
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontFamily = FontFamily.Serif
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
