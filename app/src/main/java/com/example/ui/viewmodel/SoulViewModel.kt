@@ -52,6 +52,7 @@ enum class ExportFormat(val extension: String, val displayName: String, val mime
 
 data class RecordFormState(
     val selectedEmotion: String = "Equilibrium",
+    val selectedEmotions: Set<String> = emptySet(),
     val primaryShadow: ShadowType? = null,
     val primaryVirtue: VirtueType? = null,
     val selectedShadows: Set<ShadowType> = emptySet(),
@@ -224,8 +225,13 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
                     runCatching { VirtueType.valueOf(name.trim()) }.getOrNull()
                 }?.toSet() ?: emptySet()
 
+                val restoredEmotions = if (savedDraft.emotion.isNotBlank() && savedDraft.emotion != "Equilibrium") {
+                    savedDraft.emotion.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
+                } else emptySet()
+
                 _recordFormState.value = RecordFormState(
                     selectedEmotion = savedDraft.emotion,
+                    selectedEmotions = restoredEmotions,
                     primaryShadow = restoredShadows.firstOrNull(),
                     primaryVirtue = restoredVirtues.firstOrNull(),
                     selectedShadows = restoredShadows,
@@ -671,7 +677,10 @@ class SoulViewModel(application: Application) : AndroidViewModel(application) {
         val shadowNames = allShadows.joinToString(", ") { it.displayName }
         val virtueNames = allVirtues.joinToString(", ") { it.displayName }
 
-        val effectiveEmotion = if (state.selectedEmotion.isNotBlank() && state.selectedEmotion != "Equilibrium") {
+        val emotionList = state.selectedEmotions.toList()
+        val effectiveEmotion = if (emotionList.isNotEmpty()) {
+            emotionList.joinToString(", ")
+        } else if (state.selectedEmotion.isNotBlank() && state.selectedEmotion != "Equilibrium") {
             state.selectedEmotion
         } else if (shadowNames.isNotBlank() && virtueNames.isNotBlank()) {
             "$shadowNames & $virtueNames"

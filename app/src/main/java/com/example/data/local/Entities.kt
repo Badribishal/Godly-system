@@ -96,3 +96,45 @@ data class EvaluationDraftEntity(
     val reflection: String = "",
     val lastUpdated: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "daily_emotion_records")
+data class DailyEmotionRecordEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val timestamp: Long = System.currentTimeMillis(),
+    val dateKey: String, // e.g. "2026-08-29"
+    val positiveEmotionsJson: String, // JSON array string
+    val negativeEmotionsJson: String, // JSON array string
+    val positiveCount: Int,
+    val negativeCount: Int,
+    val dominantValence: String, // "POSITIVE", "NEGATIVE", "EQUILIBRIUM"
+    val positivityRatio: Float, // 0.0f to 1.0f
+    val fantasyArchetypeId: String,
+    val fantasyArchetypeName: String,
+    val fantasyArchetypeTitle: String,
+    val fantasyArchetypeDescription: String,
+    val fantasyArchetypeRune: String,
+    val fantasyArchetypeElement: String,
+    val fantasyArchetypeAuraColorHex: Long,
+    val fantasyArchetypePowerBonus: String,
+    val dailyDecree: String,
+    val humanityShift: Int,
+    val stabilityShift: Int,
+    val userNote: String = ""
+)
+
+@Entity(tableName = "tracked_emotions")
+data class TrackedEmotionEntity(
+    @PrimaryKey
+    val id: String,
+    val name: String,
+    val valence: String, // "POSITIVE" or "NEGATIVE"
+    val category: String,
+    val runeIcon: String,
+    val essence: String,
+    val colorHex: Long,
+    val associatedForce: String? = null,
+    val usageCount: Int = 0,
+    val lastUsedTimestamp: Long? = null
+)
+

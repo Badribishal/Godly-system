@@ -11,9 +11,11 @@ import androidx.room.RoomDatabase
         SoulProfileEntity::class,
         EvolutionEventEntity::class,
         DailyTrialEntity::class,
-        EvaluationDraftEntity::class
+        EvaluationDraftEntity::class,
+        DailyEmotionRecordEntity::class,
+        TrackedEmotionEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

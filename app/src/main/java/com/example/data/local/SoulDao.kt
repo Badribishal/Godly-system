@@ -67,4 +67,39 @@ interface SoulDao {
 
     @Query("DELETE FROM evaluation_draft WHERE id = 1")
     suspend fun clearEvaluationDraft()
+
+    // Daily Emotion Records & Daily Fantasy Archetypes
+    @Query("SELECT * FROM daily_emotion_records ORDER BY timestamp DESC")
+    fun getAllEmotionRecordsFlow(): Flow<List<DailyEmotionRecordEntity>>
+
+    @Query("SELECT * FROM daily_emotion_records WHERE dateKey = :dateKey ORDER BY timestamp DESC LIMIT 1")
+    fun getEmotionRecordForDateFlow(dateKey: String): Flow<DailyEmotionRecordEntity?>
+
+    @Query("SELECT * FROM daily_emotion_records WHERE dateKey = :dateKey ORDER BY timestamp DESC LIMIT 1")
+    suspend fun getEmotionRecordForDate(dateKey: String): DailyEmotionRecordEntity?
+
+    @Query("SELECT * FROM daily_emotion_records ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentEmotionRecords(limit: Int): List<DailyEmotionRecordEntity>
+
+    @Query("SELECT COUNT(*) FROM daily_emotion_records")
+    suspend fun getEmotionRecordCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEmotionRecord(record: DailyEmotionRecordEntity): Long
+
+    @Query("DELETE FROM daily_emotion_records WHERE id = :id")
+    suspend fun deleteEmotionRecordById(id: Long)
+
+    // Tracked 42 Emotions Catalog Persistence
+    @Query("SELECT * FROM tracked_emotions ORDER BY name ASC")
+    fun getAllTrackedEmotionsFlow(): Flow<List<TrackedEmotionEntity>>
+
+    @Query("SELECT * FROM tracked_emotions WHERE valence = :valence ORDER BY name ASC")
+    fun getTrackedEmotionsByValenceFlow(valence: String): Flow<List<TrackedEmotionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTrackedEmotions(emotions: List<TrackedEmotionEntity>)
+
+    @Query("UPDATE tracked_emotions SET usageCount = usageCount + 1, lastUsedTimestamp = :timestamp WHERE id = :emotionId OR name = :emotionId")
+    suspend fun incrementEmotionUsage(emotionId: String, timestamp: Long = System.currentTimeMillis())
 }

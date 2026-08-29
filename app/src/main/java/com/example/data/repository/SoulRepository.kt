@@ -1,19 +1,25 @@
 package com.example.data.repository
 
+import com.example.data.engine.DailyFantasyArchetypeResult
+import com.example.data.engine.FantasyArchetypeEvaluationEngine
 import com.example.data.engine.PersonalityEvaluationEngine
 import com.example.data.engine.SoulResonanceData
 import com.example.data.export.SoulPdfExporter
+import com.example.data.local.DailyEmotionRecordEntity
 import com.example.data.local.DailyTrialEntity
 import com.example.data.local.EvaluationDraftEntity
 import com.example.data.local.EvaluationRecordEntity
 import com.example.data.local.EvolutionEventEntity
 import com.example.data.local.SoulDao
 import com.example.data.local.SoulProfileEntity
+import com.example.data.local.TrackedEmotionEntity
+import com.example.data.model.EmotionCatalog
 import com.example.data.model.EvaluationResult
 import com.example.data.model.RecordInput
 import com.example.data.model.ShadowType
 import com.example.data.model.SoulIdentity
 import com.example.data.model.VirtueType
+import com.example.data.model.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -22,6 +28,9 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.OutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SoulRepository(private val soulDao: SoulDao) {
 
@@ -43,6 +52,95 @@ class SoulRepository(private val soulDao: SoulDao) {
     val evaluationDraftFlow: Flow<EvaluationDraftEntity?> = soulDao.getEvaluationDraftFlow()
         .flowOn(Dispatchers.IO)
 
+    val allDailyEmotionRecordsFlow: Flow<List<DailyEmotionRecordEntity>> = soulDao.getAllEmotionRecordsFlow()
+        .flowOn(Dispatchers.IO)
+
+    val allTrackedEmotionsFlow: Flow<List<TrackedEmotionEntity>> = soulDao.getAllTrackedEmotionsFlow()
+        .flowOn(Dispatchers.IO)
+
+    suspend fun getTodayEmotionRecord(): DailyEmotionRecordEntity? = withContext(Dispatchers.IO) {
+        val todayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        soulDao.getEmotionRecordForDate(todayKey)
+    }
+
+    suspend fun getEmotionRecordForDate(dateKey: String): DailyEmotionRecordEntity? = withContext(Dispatchers.IO) {
+        soulDao.getEmotionRecordForDate(dateKey)
+    }
+
+    suspend fun recordDailyEmotions(
+        selectedPositive: Set<String>,
+        selectedNegative: Set<String>,
+        userNote: String = ""
+    ): Pair<DailyEmotionRecordEntity, DailyFantasyArchetypeResult> = withContext(Dispatchers.IO) {
+        val archetypeResult = FantasyArchetypeEvaluationEngine.evaluateDailyArchetype(
+            selectedPositive = selectedPositive,
+            selectedNegative = selectedNegative,
+            userNote = userNote
+        )
+
+        val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val recordEntity = DailyEmotionRecordEntity(
+            timestamp = System.currentTimeMillis(),
+            dateKey = dateKey,
+            positiveEmotionsJson = JSONArray(selectedPositive.toList()).toString(),
+            negativeEmotionsJson = JSONArray(selectedNegative.toList()).toString(),
+            positiveCount = archetypeResult.positiveCount,
+            negativeCount = archetypeResult.negativeCount,
+            dominantValence = archetypeResult.dominanceValence,
+            positivityRatio = archetypeResult.positivityRatio,
+            fantasyArchetypeId = archetypeResult.archetypeId,
+            fantasyArchetypeName = archetypeResult.name,
+            fantasyArchetypeTitle = archetypeResult.title,
+            fantasyArchetypeDescription = archetypeResult.description,
+            fantasyArchetypeRune = archetypeResult.runeIcon,
+            fantasyArchetypeElement = archetypeResult.element,
+            fantasyArchetypeAuraColorHex = archetypeResult.auraColorHex,
+            fantasyArchetypePowerBonus = archetypeResult.powerBonus,
+            dailyDecree = archetypeResult.dailyDecree,
+            humanityShift = archetypeResult.humanityDelta,
+            stabilityShift = archetypeResult.stabilityDelta,
+            userNote = userNote
+        )
+
+        val insertedId = soulDao.insertEmotionRecord(recordEntity)
+        val savedEntity = recordEntity.copy(id = insertedId)
+
+        // Increment emotion usage counters
+        (selectedPositive + selectedNegative).forEach { emotionName ->
+            soulDao.incrementEmotionUsage(emotionName)
+        }
+
+        // Apply humanity and stability shifts to Soul Identity & award 20 shards
+        val currentProfile = soulDao.getSoulProfile()?.toSoulIdentity() ?: SoulIdentity.initial()
+        val newHumanity = (currentProfile.humanity + archetypeResult.humanityDelta).coerceIn(0, 100)
+        val newStability = (currentProfile.stability + archetypeResult.stabilityDelta).coerceIn(0, 100)
+        val updatedProfile = currentProfile.copy(
+            humanity = newHumanity,
+            stability = newStability,
+            soulShards = currentProfile.soulShards + 20
+        )
+        soulDao.insertOrUpdateProfile(updatedProfile.toEntity())
+
+        // Insert Evolution / Archetype Attunement Event into timeline
+        val count = soulDao.getEmotionRecordCount()
+        soulDao.insertEvolutionEvent(
+            EvolutionEventEntity(
+                dayNumber = count,
+                eventType = "ARCHETYPE_MANIFESTATION",
+                title = "Daily Archetype Manifested: ${archetypeResult.name}",
+                description = "${archetypeResult.title} manifested via ${archetypeResult.dominanceValence} polarity (${archetypeResult.positiveCount} Harmonic vs ${archetypeResult.negativeCount} Shadow). Decree: \"${archetypeResult.dailyDecree}\"",
+                runeIcon = archetypeResult.runeIcon
+            )
+        )
+
+        Pair(savedEntity, archetypeResult)
+    }
+
+    suspend fun deleteEmotionRecord(id: Long) = withContext(Dispatchers.IO) {
+        soulDao.deleteEmotionRecordById(id)
+    }
+
+
     suspend fun getEvaluationDraft(): EvaluationDraftEntity? = withContext(Dispatchers.IO) {
         soulDao.getEvaluationDraft()
     }
@@ -56,6 +154,12 @@ class SoulRepository(private val soulDao: SoulDao) {
     }
 
     suspend fun initializeIfEmpty() = withContext(Dispatchers.IO) {
+        // Seed 42 Tracked Emotions Catalog into Room
+        try {
+            val entities = EmotionCatalog.TRACKED_42_EMOTIONS.map { it.toEntity() }
+            soulDao.insertTrackedEmotions(entities)
+        } catch (_: Exception) {}
+
         val existing = soulDao.getSoulProfile()
         if (existing == null) {
             val initial = SoulIdentity.initial()

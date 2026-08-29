@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,20 +33,19 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Flare
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -62,11 +63,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.data.model.EmotionCatalog
+import com.example.data.model.EmotionItem
+import com.example.data.model.EmotionValence
 import com.example.data.model.ShadowType
 import com.example.data.model.VirtueType
 import com.example.ui.theme.CelestialAmethyst
@@ -77,15 +80,13 @@ import com.example.ui.theme.RadiantGoldBright
 import com.example.ui.theme.SurfaceCard
 import com.example.ui.theme.SurfaceCardBorder
 import com.example.ui.theme.SurfaceCardElevated
-import com.example.ui.theme.TextAmethyst
-import com.example.ui.theme.TextGold
 import com.example.ui.theme.TextMuted
 import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 
 /**
- * Soul Record & Force Calibration Dialog in the Sanctuary Vault.
- * Users can enter Seven Heavenly Virtues & Seven Deadly Sins to calculate and define their Godly Identity.
+ * Soul Record & Force Calibration Dialog with full catalog of 21+ Positive Emotions,
+ * 21+ Negative Emotions, and the Seven Deadly Sins & Seven Heavenly Virtues.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -97,13 +98,29 @@ fun SoulRecordDialog(
 ) {
     var selectedShadows by remember { mutableStateOf(initialShadows) }
     var selectedVirtues by remember { mutableStateOf(initialVirtues) }
+    var selectedEmotionNames by remember { mutableStateOf(emptySet<String>()) }
     var situationText by remember { mutableStateOf("") }
     var reflectionText by remember { mutableStateOf("") }
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Duality Calibration, 1: 7 Deadly Sins, 2: 7 Heavenly Virtues
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: All Catalysts, 1: Positive, 2: Negative, 3: 7 Sins, 4: 7 Virtues
+    var searchQuery by remember { mutableStateOf("") }
     var showGuideDialog by remember { mutableStateOf(false) }
 
     if (showGuideDialog) {
         ArchetypeGuideDialog(onDismiss = { showGuideDialog = false })
+    }
+
+    val totalSelected = selectedEmotionNames.size + selectedShadows.size + selectedVirtues.size
+
+    val filteredPositive = remember(searchQuery) {
+        EmotionCatalog.POSITIVE_EMOTIONS.filter { emotion ->
+            searchQuery.isBlank() || emotion.name.contains(searchQuery, ignoreCase = true) || emotion.category.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    val filteredNegative = remember(searchQuery) {
+        EmotionCatalog.NEGATIVE_EMOTIONS.filter { emotion ->
+            searchQuery.isBlank() || emotion.name.contains(searchQuery, ignoreCase = true) || emotion.category.contains(searchQuery, ignoreCase = true)
+        }
     }
 
     Dialog(
@@ -129,7 +146,7 @@ fun SoulRecordDialog(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header Row
                 Row(
@@ -143,7 +160,7 @@ fun SoulRecordDialog(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(RadiantGold.copy(alpha = 0.2f))
                                 .border(1.2.dp, RadiantGold, CircleShape),
@@ -163,13 +180,14 @@ fun SoulRecordDialog(
                                 style = MaterialTheme.typography.titleLarge,
                                 color = RadiantGoldBright,
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 17.sp
                             )
                             Text(
-                                text = "7 Deadly Sins & 7 Heavenly Virtues Calibration",
+                                text = "52+ Positive & Negative Emotions • 14 Primal Forces",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = CelestialAmethystLight,
-                                fontSize = 11.sp
+                                fontSize = 10.5.sp
                             )
                         }
                     }
@@ -198,20 +216,16 @@ fun SoulRecordDialog(
                     }
                 }
 
-                // Duality Harmony Meter
-                val totalForces = selectedShadows.size + selectedVirtues.size
-                val shadowRatio = if (totalForces > 0) selectedShadows.size.toFloat() / totalForces else 0.5f
-                val virtueRatio = if (totalForces > 0) selectedVirtues.size.toFloat() / totalForces else 0.5f
-
+                // Balance Meter Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF0F0B1C)),
                     border = BorderStroke(1.dp, CelestialAmethyst.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -219,81 +233,97 @@ fun SoulRecordDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "🔥 ${selectedShadows.size} Sins Active",
-                                fontSize = 11.5.sp,
+                                text = "${selectedShadows.size} Sins Active",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFF87171)
                             )
                             Text(
-                                text = if (totalForces == 0) "« Balanced Alignment »"
-                                else if (selectedShadows.size > selectedVirtues.size) "« Shadow Dominant Resonance »"
-                                else if (selectedVirtues.size > selectedShadows.size) "« Sacred Dominant Resonance »"
-                                else "« Equal Duality Equilibrium »",
+                                text = if (totalSelected == 0) "« Balanced Alignment »"
+                                else "« $totalSelected Catalysts Selected »",
                                 fontSize = 11.sp,
                                 color = RadiantGold,
                                 fontFamily = FontFamily.Serif
                             )
                             Text(
-                                text = "${selectedVirtues.size} Virtues Active 🌿",
-                                fontSize = 11.5.sp,
+                                text = "${selectedVirtues.size} Virtues Active",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF34D399)
                             )
                         }
-
-                        // Split Gradient Progress Bar
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF221535))
-                        ) {
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                Box(
-                                    modifier = Modifier
-                                        .weight(shadowRatio.coerceAtLeast(0.01f))
-                                        .fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFFEF4444), Color(0xFFF59E0B))))
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .weight(virtueRatio.coerceAtLeast(0.01f))
-                                        .fillMaxHeight()
-                                        .background(Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF06B6D4))))
-                                )
-                            }
-                        }
                     }
                 }
 
-                // Force View Selector Tabs
-                TabRow(
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("dialog_search_input"),
+                    placeholder = { Text("Search 52+ emotions & forces...", fontSize = 11.5.sp, color = TextMuted) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = RadiantGold, modifier = Modifier.size(16.dp))
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Clear", tint = TextMuted, modifier = Modifier.size(14.dp))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = RadiantGold,
+                        unfocusedBorderColor = SurfaceCardBorder,
+                        focusedContainerColor = Color(0xFF110B22),
+                        unfocusedContainerColor = Color(0xFF0F091E),
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                // Scrollable Category Tabs
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = Color(0xFF110B1E),
                     contentColor = RadiantGold,
+                    edgePadding = 0.dp,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                             color = RadiantGold,
-                            height = 2.5.dp
+                            height = 2.dp
                         )
                     }
                 ) {
                     Tab(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },
-                        text = { Text("Dual Matrix", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text("Dual Matrix", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                     )
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("7 Deadly Sins", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text("✨ Positive (${filteredPositive.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF34D399)) }
                     )
                     Tab(
                         selected = selectedTab == 2,
                         onClick = { selectedTab = 2 },
-                        text = { Text("7 Virtues", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) }
+                        text = { Text("🔥 Negative (${filteredNegative.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF87171)) }
+                    )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text("7 Sins", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                    )
+                    Tab(
+                        selected = selectedTab == 4,
+                        onClick = { selectedTab = 4 },
+                        text = { Text("7 Virtues", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                     )
                 }
 
@@ -303,20 +333,96 @@ fun SoulRecordDialog(
                         .fillMaxSize()
                         .weight(1f)
                         .testTag("record_dialog_content_column"),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(vertical = 6.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    // Tab 0: Dual Matrix (Both Sins and Virtues side by side)
+                    // Positive Emotions
                     if (selectedTab == 0 || selectedTab == 1) {
                         item {
                             Text(
-                                text = "✦ SEVEN DEADLY SINS (SHADOW FORCES)",
+                                text = "✨ POSITIVE EMOTIONS (${EmotionCatalog.POSITIVE_EMOTIONS.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFF34D399),
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                filteredPositive.forEach { emotion ->
+                                    val isSelected = selectedEmotionNames.contains(emotion.name)
+                                    DialogSelectableChip(
+                                        title = emotion.name,
+                                        rune = emotion.runeIcon,
+                                        aspect = emotion.category,
+                                        glowColor = Color(emotion.colorHex),
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            selectedEmotionNames = if (isSelected) selectedEmotionNames - emotion.name else selectedEmotionNames + emotion.name
+                                            if (!isSelected && emotion.associatedVirtue != null) {
+                                                selectedVirtues = selectedVirtues + emotion.associatedVirtue
+                                            }
+                                        },
+                                        testTag = "dialog_pos_chip_${emotion.id}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Negative Emotions
+                    if (selectedTab == 0 || selectedTab == 2) {
+                        item {
+                            Text(
+                                text = "🔥 NEGATIVE EMOTIONS (${EmotionCatalog.NEGATIVE_EMOTIONS.size})",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color(0xFFF87171),
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.8.sp
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                filteredNegative.forEach { emotion ->
+                                    val isSelected = selectedEmotionNames.contains(emotion.name)
+                                    DialogSelectableChip(
+                                        title = emotion.name,
+                                        rune = emotion.runeIcon,
+                                        aspect = emotion.category,
+                                        glowColor = Color(emotion.colorHex),
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            selectedEmotionNames = if (isSelected) selectedEmotionNames - emotion.name else selectedEmotionNames + emotion.name
+                                            if (!isSelected && emotion.associatedShadow != null) {
+                                                selectedShadows = selectedShadows + emotion.associatedShadow
+                                            }
+                                        },
+                                        testTag = "dialog_neg_chip_${emotion.id}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 7 Sins
+                    if (selectedTab == 0 || selectedTab == 3) {
+                        item {
+                            Text(
+                                text = "🌑 SEVEN DEADLY SINS (SHADOW FORCES)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFFF87171),
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.8.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
@@ -325,18 +431,14 @@ fun SoulRecordDialog(
                             ) {
                                 ShadowType.values().forEach { shadow ->
                                     val isSelected = selectedShadows.contains(shadow)
-                                    ArchetypeSelectableChip(
+                                    DialogSelectableChip(
                                         title = shadow.displayName,
                                         rune = shadow.runeSymbol,
                                         aspect = shadow.title,
                                         glowColor = Color(shadow.colorHex),
                                         isSelected = isSelected,
                                         onClick = {
-                                            selectedShadows = if (isSelected) {
-                                                selectedShadows - shadow
-                                            } else {
-                                                selectedShadows + shadow
-                                            }
+                                            selectedShadows = if (isSelected) selectedShadows - shadow else selectedShadows + shadow
                                         },
                                         testTag = "sin_chip_${shadow.name.lowercase()}"
                                     )
@@ -345,16 +447,17 @@ fun SoulRecordDialog(
                         }
                     }
 
-                    if (selectedTab == 0 || selectedTab == 2) {
+                    // 7 Virtues
+                    if (selectedTab == 0 || selectedTab == 4) {
                         item {
                             Text(
-                                text = "✦ SEVEN HEAVENLY VIRTUES (SACRED FORCES)",
+                                text = "🌿 SEVEN HEAVENLY VIRTUES (SACRED FORCES)",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF34D399),
+                                color = RadiantGoldBright,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.8.sp
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             FlowRow(
                                 modifier = Modifier.fillMaxWidth(),
@@ -363,18 +466,14 @@ fun SoulRecordDialog(
                             ) {
                                 VirtueType.values().forEach { virtue ->
                                     val isSelected = selectedVirtues.contains(virtue)
-                                    ArchetypeSelectableChip(
+                                    DialogSelectableChip(
                                         title = virtue.displayName,
                                         rune = virtue.runeSymbol,
                                         aspect = virtue.title,
                                         glowColor = Color(virtue.colorHex),
                                         isSelected = isSelected,
                                         onClick = {
-                                            selectedVirtues = if (isSelected) {
-                                                selectedVirtues - virtue
-                                            } else {
-                                                selectedVirtues + virtue
-                                            }
+                                            selectedVirtues = if (isSelected) selectedVirtues - virtue else selectedVirtues + virtue
                                         },
                                         testTag = "virtue_chip_${virtue.name.lowercase()}"
                                     )
@@ -389,18 +488,18 @@ fun SoulRecordDialog(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFF110C20)),
                             border = BorderStroke(1.dp, SurfaceCardBorder),
-                            shape = RoundedCornerShape(14.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
                                     text = "✦ MANIFESTATION CONTEXT (OPTIONAL)",
                                     fontSize = 10.sp,
                                     color = RadiantGold,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp
                                 )
 
                                 OutlinedTextField(
@@ -408,10 +507,9 @@ fun SoulRecordDialog(
                                     onValueChange = { situationText = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(72.dp)
                                         .testTag("record_situation_input"),
-                                    label = { Text("What catalyzed these forces?", fontSize = 11.5.sp, color = TextMuted) },
-                                    placeholder = { Text("e.g., Faced intense rivalry; channeled envy into focused mastery.", fontSize = 11.sp, color = TextMuted.copy(alpha = 0.6f)) },
+                                    label = { Text("What catalyzed these forces?", fontSize = 11.sp, color = TextMuted) },
+                                    placeholder = { Text("e.g., Felt courage & euphoria during breakthroughs.", fontSize = 10.5.sp, color = TextMuted.copy(alpha = 0.6f)) },
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = RadiantGold,
                                         unfocusedBorderColor = SurfaceCardBorder,
@@ -420,7 +518,7 @@ fun SoulRecordDialog(
                                         focusedTextColor = TextPrimary,
                                         unfocusedTextColor = TextPrimary
                                     ),
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(8.dp)
                                 )
 
                                 OutlinedTextField(
@@ -428,10 +526,9 @@ fun SoulRecordDialog(
                                     onValueChange = { reflectionText = it },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(72.dp)
                                         .testTag("record_reflection_input"),
-                                    label = { Text("Soul Insight / Inner Decree", fontSize = 11.5.sp, color = TextMuted) },
-                                    placeholder = { Text("e.g., My pride protects my boundary without arrogance.", fontSize = 11.sp, color = TextMuted.copy(alpha = 0.6f)) },
+                                    label = { Text("Soul Insight / Inner Decree", fontSize = 11.sp, color = TextMuted) },
+                                    placeholder = { Text("e.g., I channel inner fire into sovereign clarity.", fontSize = 10.5.sp, color = TextMuted.copy(alpha = 0.6f)) },
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = EtherealCyan,
                                         unfocusedBorderColor = SurfaceCardBorder,
@@ -440,7 +537,7 @@ fun SoulRecordDialog(
                                         focusedTextColor = TextPrimary,
                                         unfocusedTextColor = TextPrimary
                                     ),
-                                    shape = RoundedCornerShape(10.dp)
+                                    shape = RoundedCornerShape(8.dp)
                                 )
                             }
                         }
@@ -450,34 +547,39 @@ fun SoulRecordDialog(
                 // Submit Button
                 Button(
                     onClick = {
-                        onSubmit(selectedShadows, selectedVirtues, situationText, reflectionText)
+                        val effectiveSituation = if (selectedEmotionNames.isNotEmpty()) {
+                            val emotionPrefix = "Emotions: ${selectedEmotionNames.joinToString(", ")}. "
+                            if (situationText.isNotBlank()) "$emotionPrefix$situationText" else emotionPrefix
+                        } else situationText
+
+                        onSubmit(selectedShadows, selectedVirtues, effectiveSituation, reflectionText)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
+                        .height(52.dp)
                         .testTag("calculate_define_me_button"),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = RadiantGold,
                         contentColor = Color(0xFF1E1102)
                     ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                             tint = Color(0xFF1E1102)
                         )
                         Text(
-                            text = "✦ CALCULATE & DEFINE GODLY IDENTITY",
-                            fontSize = 13.5.sp,
+                            text = if (totalSelected > 0) "CALCULATE & TRANSMUTE ($totalSelected CATALYSTS)" else "CALCULATE & DEFINE GODLY IDENTITY",
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
+                            letterSpacing = 0.8.sp
                         )
                     }
                 }
@@ -487,7 +589,7 @@ fun SoulRecordDialog(
 }
 
 @Composable
-private fun ArchetypeSelectableChip(
+private fun DialogSelectableChip(
     title: String,
     rune: String,
     aspect: String,
@@ -498,37 +600,37 @@ private fun ArchetypeSelectableChip(
 ) {
     val animatedBg by animateColorAsState(
         targetValue = if (isSelected) glowColor.copy(alpha = 0.25f) else Color(0xFF130D22),
-        animationSpec = tween(200), label = "chip_bg"
+        animationSpec = tween(180), label = "dialog_chip_bg"
     )
 
     Surface(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .testTag(testTag),
         color = animatedBg,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
-            1.2.dp,
+            1.dp,
             if (isSelected) glowColor else SurfaceCardBorder
         )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Text(text = rune, fontSize = 14.sp)
+            Text(text = rune, fontSize = 13.sp)
             Column {
                 Text(
                     text = title,
-                    fontSize = 11.5.sp,
+                    fontSize = 11.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                     color = if (isSelected) TextPrimary else TextSecondary
                 )
                 Text(
                     text = aspect,
-                    fontSize = 9.sp,
+                    fontSize = 8.5.sp,
                     color = if (isSelected) glowColor else TextMuted
                 )
             }
@@ -537,7 +639,7 @@ private fun ArchetypeSelectableChip(
                     imageVector = Icons.Default.Check,
                     contentDescription = "Selected",
                     tint = glowColor,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(12.dp)
                 )
             }
         }

@@ -191,6 +191,20 @@ object PersonalityEvaluationEngine {
             stabilityDelta += 4
         }
 
+        // Emotion Catalog parsing (21+ positive & 21+ negative emotions)
+        com.example.data.model.EmotionCatalog.ALL_EMOTIONS.forEach { emotion ->
+            if (textCorpus.contains(emotion.name.lowercase()) || textCorpus.contains(emotion.id.lowercase())) {
+                emotion.associatedShadow?.let { s ->
+                    shadowDeltas[s] = (shadowDeltas[s] ?: 0) + 3
+                }
+                emotion.associatedVirtue?.let { v ->
+                    virtueDeltas[v] = (virtueDeltas[v] ?: 0) + 3
+                }
+                humanityDelta += emotion.humanityShift
+                stabilityDelta += emotion.stabilityShift
+            }
+        }
+
         // Direct selections fallback
         input.primaryShadow?.let {
             shadowDeltas[it] = (shadowDeltas[it] ?: 0) + 4
